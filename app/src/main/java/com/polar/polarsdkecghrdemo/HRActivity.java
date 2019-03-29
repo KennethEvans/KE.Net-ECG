@@ -1,6 +1,7 @@
 package com.polar.polarsdkecghrdemo;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -32,7 +33,7 @@ import polar.com.sdk.api.model.PolarSensorSetting;
 public class HRActivity extends AppCompatActivity implements PlotterListener {
 
     private XYPlot plot;
-    private Plotter plotter;
+    private DatePlotter plotter;
 
     TextView textViewHR, textViewFW;
     private String TAG = "Polar_HRActivity";
@@ -138,7 +139,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 }
                 msg += "]";
                 textViewHR.setText(msg);
-                plotter.sendSingleSample((float) (polarHrData.hr));
+                plotter.addValue(polarHrData);
             }
 
             @Override
@@ -148,13 +149,14 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
         });
         api.connectToPolarDevice(DEVICE_ID);
 
-        plotter = new Plotter(this, "HR/RR");
+        plotter = new DatePlotter(this, "HR/RR");
         plotter.setListener(this);
+//        plotter.getFormatter().getLinePaint().setColor(Color.rgb(0, 0,255));
 
         plot.addSeries(plotter.getSeries(), plotter.getFormatter());
-        plot.setRangeBoundaries(0, 180, BoundaryMode.FIXED);
+        plot.setRangeBoundaries(50, 100, BoundaryMode.AUTO);
         plot.setRangeStep(StepMode.INCREMENT_BY_FIT, 10);
-        plot.setDomainBoundaries(0, 500, BoundaryMode.GROW);
+        plot.setDomainBoundaries(0, 500, BoundaryMode.AUTO);
         plot.setLinesPerRangeLabel(2);
     }
 
