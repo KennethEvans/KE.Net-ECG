@@ -15,7 +15,7 @@
         android:layout_marginBottom="8dp"
         android:textSize="20sp"
         android:textColor="#000000"
-        app:layout_constraintBottom_toBottomOf="@+id/info"
+            app:layout_constraintBottom_toBottomOf="@+id/info"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"

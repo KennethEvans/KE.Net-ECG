@@ -1,7 +1,6 @@
 package com.polar.polarsdkecghrdemo;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -13,22 +12,14 @@ import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYPlot;
 
-import org.reactivestreams.Publisher;
-
 import java.util.List;
 
-import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
-import io.reactivex.functions.Action;
-import io.reactivex.functions.Consumer;
-import io.reactivex.functions.Function;
 import polar.com.sdk.api.PolarBleApi;
 import polar.com.sdk.api.PolarBleApiCallback;
 import polar.com.sdk.api.PolarBleApiDefaultImpl;
 import polar.com.sdk.api.model.PolarDeviceInfo;
-import polar.com.sdk.api.model.PolarEcgData;
 import polar.com.sdk.api.model.PolarHrData;
-import polar.com.sdk.api.model.PolarSensorSetting;
 
 public class HRActivity extends AppCompatActivity implements PlotterListener {
 
@@ -130,14 +121,13 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                                                PolarHrData polarHrData) {
                 Log.d(TAG, "HR " + polarHrData.hr);
                 List<Integer> rrsMs = polarHrData.rrsMs;
-                String msg = String.valueOf(polarHrData.hr) + "\n[";
+                String msg = String.valueOf(polarHrData.hr) + "\n";
                 for (int i : rrsMs) {
                     msg += i + ",";
                 }
                 if (msg.endsWith(",")) {
                     msg = msg.substring(0, msg.length() - 1);
                 }
-                msg += "]";
                 textViewHR.setText(msg);
                 plotter.addValue(polarHrData);
             }
@@ -151,9 +141,10 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
         plotter = new DatePlotter(this, "HR/RR");
         plotter.setListener(this);
-//        plotter.getFormatter().getLinePaint().setColor(Color.rgb(0, 0,255));
+//        plotter.getHrFormatter().getLinePaint().setColor(Color.rgb(0, 0,255));
 
-        plot.addSeries(plotter.getSeries(), plotter.getFormatter());
+        plot.addSeries(plotter.getHrSeries(), plotter.getHrFormatter());
+        plot.addSeries(plotter.getRrSeries(), plotter.getRrFormatter());
         plot.setRangeBoundaries(50, 100, BoundaryMode.AUTO);
         plot.setRangeStep(StepMode.INCREMENT_BY_FIT, 10);
         plot.setDomainBoundaries(0, 500, BoundaryMode.AUTO);

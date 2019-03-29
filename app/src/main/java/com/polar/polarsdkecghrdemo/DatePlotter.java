@@ -2,16 +2,14 @@ package com.polar.polarsdkecghrdemo;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.graphics.Paint;
 
-import com.androidplot.ui.Formatter;
-import com.androidplot.xy.AdvancedLineAndPointRenderer;
 import com.androidplot.xy.LineAndPointFormatter;
 import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.XYSeriesFormatter;
 
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 import polar.com.sdk.api.model.PolarHrData;
 
@@ -22,10 +20,14 @@ public class DatePlotter {
     private String TAG = "Polar_Plotter";
     private PlotterListener listener;
     private Context context;
-    private XYSeriesFormatter formatter;
-    private SimpleXYSeries series;
-    private Double[] xVals = new Double[NVALS];
-    private Double[] yVals = new Double[NVALS];
+    private XYSeriesFormatter hrFormatter;
+    private XYSeriesFormatter rrFormatter;
+    private SimpleXYSeries hrSeries;
+    private SimpleXYSeries rrSeries;
+    private Double[] xHrVals = new Double[NVALS];
+    private Double[] yHrVals = new Double[NVALS];
+    private Double[] xRrVals = new Double[NVALS];
+    private Double[] yRrVals = new Double[NVALS];
 
     public DatePlotter(Context context, String title) {
         this.context = context;
@@ -36,38 +38,85 @@ public class DatePlotter {
         double delta = (endTime - startTime) / (NVALS - 1);
 
         for (int i = 0; i < NVALS; i++) {
-            xVals[i] = new Double(startTime + i * delta);
-            yVals[i] = new Double(60);
-//            yVals[i] = null;
+            xHrVals[i] = new Double(startTime + i * delta);
+            yHrVals[i] = new Double(60);
+            xRrVals[i] = new Double(startTime + i * delta);
+            yRrVals[i] = new Double(100);
+//            yHrVals[i] = null;
         }
 
-        formatter = new LineAndPointFormatter(Color.RED,
+        hrFormatter = new LineAndPointFormatter(Color.RED,
                 null, null, null);
-        formatter.setLegendIconEnabled(false);
+        hrFormatter.setLegendIconEnabled(false);
+        hrSeries = new SimpleXYSeries(Arrays.asList(xHrVals),
+                Arrays.asList(yHrVals),
+                "HR");
 
-        series = new SimpleXYSeries(Arrays.asList(xVals), Arrays.asList(yVals),
+        rrFormatter = new LineAndPointFormatter(Color.BLUE,
+                null, null, null);
+        rrFormatter.setLegendIconEnabled(false);
+        rrSeries = new SimpleXYSeries(Arrays.asList(xRrVals),
+                Arrays.asList(yRrVals),
                 "HR");
     }
 
-    public SimpleXYSeries getSeries() {
-        return (SimpleXYSeries) series;
+    public SimpleXYSeries getHrSeries() {
+        return (SimpleXYSeries) hrSeries;
     }
 
-    public XYSeriesFormatter getFormatter() {
-        return formatter;
+    public SimpleXYSeries getRrSeries() {
+        return (SimpleXYSeries) rrSeries;
+    }
+
+    public XYSeriesFormatter getHrFormatter() {
+        return hrFormatter;
+    }
+
+    public XYSeriesFormatter getRrFormatter() {
+        return rrFormatter;
     }
 
     public void addValue(PolarHrData polarHrData) {
         Date now = new Date();
         long time = now.getTime();
-        for (int i = 0; i < NVALS -1; i++) {
-            xVals[i] = xVals[i+1];
-            yVals[i] = yVals[i+1];
-            series.setXY(xVals[i], yVals[i], i);
+        for (int i = 0; i < NVALS - 1; i++) {
+            xHrVals[i] = xHrVals[i + 1];
+            yHrVals[i] = yHrVals[i + 1];
+            hrSeries.setXY(xHrVals[i], yHrVals[i], i);
         }
-        xVals[NVALS -1] = new Double(time);
-        yVals[NVALS-1] = new Double(polarHrData.hr);
-        series.setXY(xVals[NVALS -1], yVals[NVALS -1], NVALS -1);
+        xHrVals[NVALS - 1] = new Double(time);
+        yHrVals[NVALS - 1] = new Double(polarHrData.hr);
+        hrSeries.setXY(xHrVals[NVALS - 1], yHrVals[NVALS - 1], NVALS - 1);
+
+        // Do RR
+        // Assume the R points are time - intervalN - intervalN-1 ... - interval0
+        // Gives approximately the right shape of the RR curve
+        // But displaced by an unknown amount (since time is not in the data)
+        // And the displacement is different for each reading
+        List<Integer> rrsMs = polarHrData.rrsMs;
+        int nRrVals = rrsMs.size();
+        if (nRrVals > 0) {
+            for (int i = 0; i < NVALS - nRrVals; i++) {
+                xRrVals[i] = xRrVals[i + 1];
+                yRrVals[i] = yRrVals[i + 1];
+                rrSeries.setXY(xRrVals[i], yRrVals[i], i);
+            }
+            double totalRR = 0;
+            double scale = .1;
+            for (int i = 0; i < nRrVals; i++) {
+                totalRR += scale * rrsMs.get(i);
+            }
+            int index = 0;
+            double rr;
+            for (int i = NVALS - nRrVals; i < NVALS; i++) {
+                rr = scale * rrsMs.get(index++);
+                xRrVals[i] = new Double(time - totalRR);
+                yRrVals[i] = new Double(rr);
+                totalRR -= rr;
+                rrSeries.setXY(xRrVals[i], yRrVals[i], i);
+            }
+        }
+
         listener.update();
     }
 
@@ -80,7 +129,7 @@ public class DatePlotter {
 //            plotNumbers[dataIndex + 1] = null;
 //        }
 //
-//        ((SimpleXYSeries) series).setModel(Arrays.asList(plotNumbers),
+//        ((SimpleXYSeries) hrSeries).setModel(Arrays.asList(plotNumbers),
 //                SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
 //        dataIndex++;
 //        listener.update();
