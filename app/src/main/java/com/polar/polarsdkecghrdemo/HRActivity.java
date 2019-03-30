@@ -10,8 +10,10 @@ import android.widget.Toast;
 
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.StepMode;
+import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
 
+import java.text.DecimalFormat;
 import java.util.List;
 
 import io.reactivex.disposables.Disposable;
@@ -24,7 +26,7 @@ import polar.com.sdk.api.model.PolarHrData;
 public class HRActivity extends AppCompatActivity implements PlotterListener {
 
     private XYPlot plot;
-    private DatePlotter plotter;
+    private TimePlotter plotter;
 
     TextView textViewHR, textViewFW;
     private String TAG = "Polar_HRActivity";
@@ -129,7 +131,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                     msg = msg.substring(0, msg.length() - 1);
                 }
                 textViewHR.setText(msg);
-                plotter.addValue(polarHrData);
+                plotter.addValues(polarHrData);
             }
 
             @Override
@@ -139,15 +141,22 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
         });
         api.connectToPolarDevice(DEVICE_ID);
 
-        plotter = new DatePlotter(this, "HR/RR");
+        plotter = new TimePlotter(this, "HR/RR");
         plotter.setListener(this);
-//        plotter.getHrFormatter().getLinePaint().setColor(Color.rgb(0, 0,255));
 
         plot.addSeries(plotter.getHrSeries(), plotter.getHrFormatter());
         plot.addSeries(plotter.getRrSeries(), plotter.getRrFormatter());
-        plot.setRangeBoundaries(50, 100, BoundaryMode.AUTO);
-        plot.setRangeStep(StepMode.INCREMENT_BY_FIT, 10);
-        plot.setDomainBoundaries(0, 500, BoundaryMode.AUTO);
+        plot.setRangeBoundaries(50, 100,
+                BoundaryMode.AUTO);
+        plot.setDomainBoundaries(0, 360000,
+                BoundaryMode.AUTO);
+        // Left labels will increment by 10
+        plot.setRangeStep(StepMode.INCREMENT_BY_VAL, 10);
+        plot.setDomainStep(StepMode.INCREMENT_BY_VAL, 60000);
+        // Make left labels be an integer (no decimal places)
+        plot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.LEFT).
+                setFormat(new DecimalFormat("#"));
+        // These don't seem to have an effect
         plot.setLinesPerRangeLabel(2);
     }
 

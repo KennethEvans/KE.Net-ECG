@@ -130,15 +130,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             public void hrNotificationReceived(String s,
                                                PolarHrData polarHrData) {
                 Log.d(TAG, "HR " + polarHrData.hr);
-                List<Integer> rrsMs = polarHrData.rrsMs;
-                String msg = String.valueOf(polarHrData.hr) + "\n";
-                for (int i : rrsMs) {
-                    msg += i + ",";
-                }
-                if (msg.endsWith(",")) {
-                    msg = msg.substring(0, msg.length() - 1);
-                }
-                textViewHR.setText(msg);
+                textViewHR.setText(String.valueOf(polarHrData.hr));
             }
 
             @Override

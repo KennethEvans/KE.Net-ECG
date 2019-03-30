@@ -43,19 +43,35 @@
         android:layout_width="fill_parent"
         android:layout_height="304dp"
         android:layout_marginTop="345dp"
-        app:graphMarginTop="12dp"
-        app:graphMarginBottom="12dp"
-        app:gridBackgroundColor="@color/colorAccent"
-        app:graphBackgroundColor="@color/colorAccent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="1.0"
-        app:lineLabelInsetLeft="12dp"
+
+        app:paddingTop="5dp"
+        app:paddingBottom="5dp"
+        app:paddingLeft="5dp"
+        app:paddingRight="5dp"
+        app:backgroundColor="@color/colorAccent"
+
+        app:gridBackgroundColor="@color/colorAccent"
+        app:graphBackgroundColor="@color/colorAccent"
+        app:graphMarginTop="20dp"
+        app:graphMarginBottom="12dp"
+        app:graphMarginLeft="30dp"
+        app:graphMarginRight="5dp"
+        app:gridInsetLeft="25dp"
+        app:title="@string/hr_title"
+        app:titleTextColor="#000000"
+        app:titleTextSize="15dp"
+        app:rangeTitle="@string/hr_range_title"
+        app:rangeTitleTextColor="#000000"
+        app:rangeTitleTextSize="14dp"
+
         app:lineLabels="left"
         app:renderMode="use_background_thread"
-        app:title="" />
+      />
 
 </android.support.constraint.ConstraintLayout>
