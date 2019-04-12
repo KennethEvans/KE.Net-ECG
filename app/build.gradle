@@ -20,7 +20,7 @@ android {
 
 task copySdk {
     copy {
-        from("$projectDir/../../polar-sdk-android/libs")
+        from("$projectDir/../../polar-sdk-android-no-filter/libs")
         into("$projectDir/libs")
     }
 }

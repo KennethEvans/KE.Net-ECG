@@ -37,6 +37,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_hr);
         DEVICE_ID = getIntent().getStringExtra("id");
@@ -49,6 +50,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 PolarBleApi.FEATURE_BATTERY_INFO |
                         PolarBleApi.FEATURE_DEVICE_INFO |
                         PolarBleApi.FEATURE_HR);
+        api.setPolarFilter(false);
         api.setApiCallback(new PolarBleApiCallback() {
             @Override
             public void blePowerStateChanged(boolean b) {
@@ -64,7 +66,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
             @Override
             public void polarDeviceConnecting(PolarDeviceInfo polarDeviceInfo) {
-
+                Log.d(TAG, "CONNECTING: " + polarDeviceInfo.deviceId);
             }
 
             @Override
@@ -123,14 +125,15 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                                                PolarHrData polarHrData) {
                 Log.d(TAG, "HR " + polarHrData.hr);
                 List<Integer> rrsMs = polarHrData.rrsMs;
-                String msg = String.valueOf(polarHrData.hr) + "\n";
+                StringBuilder msg = new StringBuilder();
+                msg.append(polarHrData.hr).append("\n");
                 for (int i : rrsMs) {
-                    msg += i + ",";
+                    msg.append(i).append(",");
                 }
-                if (msg.endsWith(",")) {
-                    msg = msg.substring(0, msg.length() - 1);
+                if (msg.toString().endsWith(",")) {
+                    msg = new StringBuilder(msg.substring(0, msg.length() - 1));
                 }
-                textViewHR.setText(msg);
+                textViewHR.setText(msg.toString());
                 plotter.addValues(polarHrData);
             }
 
@@ -139,6 +142,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 Log.d(TAG, "Polar FTP ready " + s);
             }
         });
+        Log.d(TAG, "onCreate: connectToPolarDevice: DEVICE_ID=" + DEVICE_ID);
         api.connectToPolarDevice(DEVICE_ID);
 
         plotter = new TimePlotter(this, "HR/RR");

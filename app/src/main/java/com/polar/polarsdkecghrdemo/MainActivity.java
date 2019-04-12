@@ -75,6 +75,8 @@ public class MainActivity extends AppCompatActivity {
 
         final EditText input = viewInflated.findViewById(R.id.input);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
+        DEVICE_ID = sharedPreferences.getString(sharedPrefsKey,"");
+        input.setText(DEVICE_ID);
         dialog.setView(viewInflated);
 
         dialog.setPositiveButton("OK", new DialogInterface.OnClickListener() {
