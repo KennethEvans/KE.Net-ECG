@@ -71,7 +71,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 String msg = s.name + "\n" + s.deviceId;
                 textViewFW1.append(msg + "\n");
 
-                Toast.makeText(classContext, R.string.connected,
+                Toast.makeText(classContext, R.string.connected + " " + s.deviceId,
                         Toast.LENGTH_SHORT).show();
             }
 
@@ -180,7 +180,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 String msg = s.name + "\n" + s.deviceId;
                 textViewFW2.append(msg + "\n");
 
-                Toast.makeText(classContext, R.string.connected,
+                Toast.makeText(classContext, R.string.connected + " " + s.deviceId,
                         Toast.LENGTH_SHORT).show();
             }
 
