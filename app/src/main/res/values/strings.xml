@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Polar HR Compare</string>
+    <string name="hr_name">HR Compare</string>
+    <string name="hr_title">HR and RR vs. Time (for 1 min)</string>
+    <string name="hr_range_title">HR, /sec RR, ms/10</string>
+    <string name="disconnect">DISCONNECT</string>
+    <string name="connect">CONNECT</string>
+    <string name="connecting">Connecting to device</string>
+    <string name="connected">Connected!</string>
+    <string name="device_id">device_id</string>
+    <string name="set_id1_button">Change Device ID 1</string>
+    <string name="set_id2_button">Change Device ID 2</string>
+</resources>
