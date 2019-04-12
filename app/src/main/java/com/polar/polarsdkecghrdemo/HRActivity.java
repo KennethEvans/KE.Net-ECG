@@ -60,6 +60,9 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
             @Override
             public void polarDeviceConnected(PolarDeviceInfo s) {
                 Log.d(TAG, "Device connected " + s.deviceId);
+                String msg = s.name + "\n" + s.deviceId;
+                textViewFW.append(msg + "\n");
+
                 Toast.makeText(classContext, R.string.connected,
                         Toast.LENGTH_SHORT).show();
             }
@@ -107,15 +110,18 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
             @Override
             public void fwInformationReceived(String s, String s1) {
-                String msg = "Firmware: " + s1.trim();
                 Log.d(TAG, "Firmware: " + s + " " + s1.trim());
-                textViewFW.append(msg + "\n");
+                // Don't write if the information is empty
+                if (!s1.isEmpty()) {
+                    String msg = "Firmware: " + s1.trim();
+                    textViewFW.append(msg + "\n");
+                }
             }
 
             @Override
             public void batteryLevelReceived(String s, int i) {
-                String msg = "ID: " + s + "\nBattery level: " + i;
                 Log.d(TAG, "Battery level " + s + " " + i);
+                String msg = "Battery level: " + i;
 //                Toast.makeText(classContext, msg, Toast.LENGTH_LONG).show();
                 textViewFW.append(msg + "\n");
             }
