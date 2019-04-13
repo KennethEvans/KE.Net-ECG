@@ -9,14 +9,13 @@ import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.androidplot.Plot;
 import com.androidplot.xy.BoundaryMode;
-import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
 
 import java.text.DecimalFormat;
+import java.util.Date;
 import java.util.List;
 
 import io.reactivex.disposables.Disposable;
@@ -27,7 +26,7 @@ import polar.com.sdk.api.model.PolarDeviceInfo;
 import polar.com.sdk.api.model.PolarHrData;
 
 public class HRActivity extends AppCompatActivity implements PlotterListener {
-
+    private static final int DURATION = 60000;  // In ms
     private XYPlot plot;
     private TimePlotter plotter1, plotter2;
 
@@ -71,7 +70,8 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 String msg = s.name + "\n" + s.deviceId;
                 textViewFW1.append(msg + "\n");
 
-                Toast.makeText(classContext, R.string.connected + " " + s.deviceId,
+                Toast.makeText(classContext,
+                        R.string.connected + " " + s.deviceId,
                         Toast.LENGTH_SHORT).show();
             }
 
@@ -148,7 +148,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                     msg = new StringBuilder(msg.substring(0, msg.length() - 1));
                 }
                 textViewHR1.setText(msg.toString());
-                plotter1.addValues(polarHrData);
+                plotter1.addValues(plot, polarHrData);
             }
 
             @Override
@@ -180,7 +180,8 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 String msg = s.name + "\n" + s.deviceId;
                 textViewFW2.append(msg + "\n");
 
-                Toast.makeText(classContext, R.string.connected + " " + s.deviceId,
+                Toast.makeText(classContext,
+                        R.string.connected + " " + s.deviceId,
                         Toast.LENGTH_SHORT).show();
             }
 
@@ -257,7 +258,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                     msg = new StringBuilder(msg.substring(0, msg.length() - 1));
                 }
                 textViewHR2.setText(msg.toString());
-                plotter2.addValues(polarHrData);
+                plotter2.addValues(plot, polarHrData);
             }
 
             @Override
@@ -271,9 +272,13 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
             api2.connectToPolarDevice(DEVICE_ID_2);
         }
 
-        plotter1 = new TimePlotter(this, "HR1/RR1", Color.RED, Color.BLUE);
+        long now = new Date().getTime();
+
+        plotter1 = new TimePlotter(this, DURATION, "HR1/RR1",
+                Color.RED, Color.BLUE);
         plotter1.setListener(this);
-        plotter2 = new TimePlotter(this, "HR2/RR2", Color.rgb(0xFF, 0x88, 0xAA),
+        plotter2 = new TimePlotter(this, DURATION, "HR2/RR2",
+                Color.rgb(0xFF, 0x88, 0xAA),
                 Color.rgb(0x88, 0, 0x88));
         plotter2.setListener(this);
 
@@ -283,18 +288,18 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
         plot.addSeries(plotter2.getRrSeries(), plotter2.getRrFormatter());
         plot.setRangeBoundaries(50, 100,
                 BoundaryMode.AUTO);
-        plot.setDomainBoundaries(0, 60000,
-                BoundaryMode.AUTO);
-        // Left labels will increment by 10
+        plot.setDomainBoundaries(now - DURATION, now,
+                BoundaryMode.FIXED);
         plot.setRangeStep(StepMode.INCREMENT_BY_VAL, 10);
         plot.setDomainStep(StepMode.INCREMENT_BY_VAL, 10000);
         // Make left labels be an integer (no decimal places)
         plot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.LEFT).
                 setFormat(new DecimalFormat("#"));
-        // These don't seem to have an effect
         plot.setLinesPerRangeLabel(2);
+        plot.setTitle(getString(R.string.hr_title, DURATION / 60000));
 
-//        PanZoom.attach(plot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.STRETCH_HORIZONTAL);
+//        PanZoom.attach(plot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom
+// .STRETCH_HORIZONTAL);
     }
 
     @Override

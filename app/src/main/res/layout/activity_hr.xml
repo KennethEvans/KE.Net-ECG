@@ -2,7 +2,6 @@
 <android.support.constraint.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -101,7 +100,6 @@
         app:graphMarginLeft="30dp"
         app:graphMarginRight="5dp"
         app:gridInsetLeft="25dp"
-        app:title="@string/hr_title"
         app:titleTextColor="#000000"
         app:titleTextSize="15dp"
         app:rangeTitle="@string/hr_range_title"
