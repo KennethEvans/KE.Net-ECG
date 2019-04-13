@@ -1,6 +1,7 @@
 package com.polar.polarsdkecghrdemo;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -14,6 +15,7 @@ import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
 
 import java.text.DecimalFormat;
+import java.util.Date;
 import java.util.List;
 
 import io.reactivex.disposables.Disposable;
@@ -24,7 +26,7 @@ import polar.com.sdk.api.model.PolarDeviceInfo;
 import polar.com.sdk.api.model.PolarHrData;
 
 public class HRActivity extends AppCompatActivity implements PlotterListener {
-
+    private static final int DURATION = 300000;  // In ms
     private XYPlot plot;
     private TimePlotter plotter;
 
@@ -109,11 +111,11 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
             }
 
             @Override
-            public void fwInformationReceived(String s, String s1) {
-                Log.d(TAG, "Firmware: " + s + " " + s1.trim());
+            public void fwInformationReceived(String s, String fw) {
+                Log.d(TAG, "Firmware: " + s + " " + fw.trim());
                 // Don't write if the information is empty
-                if (!s1.isEmpty()) {
-                    String msg = "Firmware: " + s1.trim();
+                if (!fw.isEmpty()) {
+                    String msg = "Firmware: " + fw.trim();
                     textViewFW.append(msg + "\n");
                 }
             }
@@ -140,7 +142,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                     msg = new StringBuilder(msg.substring(0, msg.length() - 1));
                 }
                 textViewHR.setText(msg.toString());
-                plotter.addValues(polarHrData);
+                plotter.addValues(plot, polarHrData);
             }
 
             @Override
@@ -151,23 +153,27 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
         Log.d(TAG, "onCreate: connectToPolarDevice: DEVICE_ID=" + DEVICE_ID);
         api.connectToPolarDevice(DEVICE_ID);
 
-        plotter = new TimePlotter(this, "HR/RR");
+        long now = new Date().getTime();
+        plotter = new TimePlotter(this, DURATION, "HR/RR", Color.RED,
+                Color.BLUE);
         plotter.setListener(this);
 
         plot.addSeries(plotter.getHrSeries(), plotter.getHrFormatter());
         plot.addSeries(plotter.getRrSeries(), plotter.getRrFormatter());
         plot.setRangeBoundaries(50, 100,
                 BoundaryMode.AUTO);
-        plot.setDomainBoundaries(0, 360000,
-                BoundaryMode.AUTO);
-        // Left labels will increment by 10
+        plot.setDomainBoundaries(now - DURATION, now, BoundaryMode.FIXED);
         plot.setRangeStep(StepMode.INCREMENT_BY_VAL, 10);
-        plot.setDomainStep(StepMode.INCREMENT_BY_VAL, 60000);
+        plot.setDomainStep(StepMode.INCREMENT_BY_VAL, DURATION / 6);
         // Make left labels be an integer (no decimal places)
         plot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.LEFT).
                 setFormat(new DecimalFormat("#"));
         // These don't seem to have an effect
         plot.setLinesPerRangeLabel(2);
+        plot.setTitle(getString(R.string.hr_title, DURATION / 60000));
+
+//        PanZoom.attach(plot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom
+// .STRETCH_HORIZONTAL);
     }
 
     @Override
