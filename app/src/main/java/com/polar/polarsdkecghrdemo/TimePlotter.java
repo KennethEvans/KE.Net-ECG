@@ -16,6 +16,7 @@ import polar.com.sdk.api.model.PolarHrData;
 /**
  * Implements two series for HR and RR using time for the x values.
  */
+@SuppressWarnings("WeakerAccess")
 public class TimePlotter {
     private String title;
     private String TAG = "Polar_Plotter";

@@ -139,10 +139,10 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                     msg.append(i).append(",");
                 }
                 if (msg.toString().endsWith(",")) {
-                    msg = new StringBuilder(msg.substring(0, msg.length() - 1));
+                    msg.deleteCharAt(msg.length() - 1);
                 }
-                textViewHR.setText(msg.toString());
                 plotter.addValues(plot, polarHrData);
+                textViewHR.setText(msg.toString());
             }
 
             @Override
@@ -164,7 +164,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 BoundaryMode.AUTO);
         plot.setDomainBoundaries(now - DURATION, now, BoundaryMode.FIXED);
         plot.setRangeStep(StepMode.INCREMENT_BY_VAL, 10);
-        plot.setDomainStep(StepMode.INCREMENT_BY_VAL, DURATION / 6);
+        plot.setDomainStep(StepMode.INCREMENT_BY_VAL, DURATION / 6.);
         // Make left labels be an integer (no decimal places)
         plot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.LEFT).
                 setFormat(new DecimalFormat("#"));
