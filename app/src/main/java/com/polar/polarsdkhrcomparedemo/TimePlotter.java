@@ -1,6 +1,7 @@
 package com.polar.polarsdkhrcomparedemo;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
@@ -10,12 +11,14 @@ import com.androidplot.xy.XYSeriesFormatter;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import polar.com.sdk.api.model.PolarHrData;
 
 /**
  * Implements two series for HR and RR using time for the x values.
  */
+@SuppressWarnings("WeakerAccess")
 public class TimePlotter {
     private String title;
     private String TAG = "Polar_Plotter";
@@ -28,6 +31,10 @@ public class TimePlotter {
     private SimpleXYSeries hrSeries;
     private SimpleXYSeries rrSeries;
 
+    private double startRrTime = Double.NEGATIVE_INFINITY;
+    private double lastRrTime;
+    private double totalRrTime;
+
     public TimePlotter(Context context, int duration, String title,
                        Integer hrColor,
                        Integer rrColor) {
@@ -35,12 +42,12 @@ public class TimePlotter {
         this.duration = duration;
         this.title = title;  // Not used
         Date now = new Date();
-        hrFormatter = new LineAndPointFormatter(hrColor, null,
+        hrFormatter = new LineAndPointFormatter(hrColor, hrColor,
                 null, null);
         hrFormatter.setLegendIconEnabled(false);
         hrSeries = new SimpleXYSeries("HR");
 
-        rrFormatter = new LineAndPointFormatter(rrColor, null,
+        rrFormatter = new LineAndPointFormatter(rrColor, rrColor,
                 null, null);
         rrFormatter.setLegendIconEnabled(false);
         rrSeries = new SimpleXYSeries("HR");
@@ -101,17 +108,36 @@ public class TimePlotter {
         if (nRrVals > 0) {
             double totalRR = 0;
             for (int i = 0; i < nRrVals; i++) {
-                totalRR += RR_SCALE * rrsMs.get(i);
+                totalRR += rrsMs.get(i);
             }
+            if (Double.isInfinite(startRrTime)) {
+                startRrTime = now - totalRR;
+                totalRrTime = 0;
+            }
+            lastRrTime = now;
+            totalRrTime += totalRR;
+            Log.d(TAG, "lastRrTime=" + lastRrTime
+                    + " totalRR=" + totalRR
+                    + " elapsed=" + (lastRrTime - startRrTime)
+                    + " totalRrTime=" + totalRrTime);
+            totalRR *= RR_SCALE;
             int index = 0;
             double rr;
             for (int i = nRrVals - 1; i >= 0; i--) {
                 rr = RR_SCALE * rrsMs.get(index++);
-                totalRR -= rr;
                 rrSeries.addLast(now - totalRR, rr);
             }
         }
         listener.update();
+    }
+
+    public String getRrInfo() {
+        double elapsed = .001 * (lastRrTime - startRrTime);
+        double total = .001 * totalRrTime;
+        double ratio = total / elapsed;
+        return "Tot=" + String.format(Locale.US, "%.2f", elapsed)
+                + " RR=" + String.format(Locale.US, "%.2f", total)
+                + " (" + String.format(Locale.US, "%.2f", ratio) + ")";
     }
 
     public void setListener(PlotterListener listener) {

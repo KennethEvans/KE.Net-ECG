@@ -30,8 +30,8 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
     private XYPlot plot;
     private TimePlotter plotter1, plotter2;
 
-    TextView textViewHR1, textViewFW1;
-    TextView textViewHR2, textViewFW2;
+    TextView textViewHR1, textViewRR1, textViewFW1;
+    TextView textViewHR2, textViewRR2, textViewFW2;
     private String TAG = "Polar_HRActivity";
     public PolarBleApi api1, api2;
     private Disposable ecgDisposable = null;
@@ -45,9 +45,11 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
         setContentView(R.layout.activity_hr);
         DEVICE_ID_1 = getIntent().getStringExtra("id1");
         DEVICE_ID_2 = getIntent().getStringExtra("id2");
-        textViewHR1 = findViewById(R.id.info1);
+        textViewHR1 = findViewById(R.id.hrinfo1);
+        textViewRR1 = findViewById(R.id.rrinfo1);
         textViewFW1 = findViewById(R.id.fw1);
-        textViewHR2 = findViewById(R.id.info2);
+        textViewHR2 = findViewById(R.id.hrinfo2);
+        textViewRR2 = findViewById(R.id.rrinfo2);
         textViewFW2 = findViewById(R.id.fw2);
 
         plot = findViewById(R.id.plot);
@@ -68,7 +70,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
             public void polarDeviceConnected(PolarDeviceInfo s) {
                 Log.d(TAG, "Device connected " + s.deviceId);
                 String msg = s.name + "\n" + s.deviceId;
-                textViewFW1.append(msg + "\n");
+                textViewFW1.append("\n" + msg);
 
                 Toast.makeText(classContext,
                         R.string.connected + " " + s.deviceId,
@@ -122,33 +124,34 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 // Don't write if the information is empty
                 if (!fw.isEmpty()) {
                     String msg = "Firmware: " + fw.trim();
-                    textViewFW1.append(msg + "\n");
+                    textViewFW1.append("\n" + msg);
                 }
             }
 
             @Override
             public void batteryLevelReceived(String s, int i) {
-                Log.d(TAG, "Battery level " + s + " " + i);
+                Log.d(TAG, "Battery level 1 " + s + " " + i);
                 String msg = "Battery level: " + i;
 //                Toast.makeText(classContext, msg, Toast.LENGTH_LONG).show();
-                textViewFW1.append(msg + "\n");
+                textViewFW1.append("\n" + msg);
             }
 
             @Override
             public void hrNotificationReceived(String s,
                                                PolarHrData polarHrData) {
-                Log.d(TAG, "HR " + polarHrData.hr);
+                Log.d(TAG, "HR1 " + polarHrData.hr);
                 List<Integer> rrsMs = polarHrData.rrsMs;
                 StringBuilder msg = new StringBuilder();
-                msg.append(polarHrData.hr).append("\n");
                 for (int i : rrsMs) {
                     msg.append(i).append(",");
                 }
                 if (msg.toString().endsWith(",")) {
-                    msg = new StringBuilder(msg.substring(0, msg.length() - 1));
+                    msg.deleteCharAt(msg.length() - 1);
                 }
-                textViewHR1.setText(msg.toString());
                 plotter1.addValues(plot, polarHrData);
+                msg.append("\n").append(plotter1.getRrInfo());
+                textViewHR1.setText(String.valueOf(polarHrData.hr));
+                textViewRR1.setText(msg.toString());
             }
 
             @Override
@@ -178,7 +181,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
             public void polarDeviceConnected(PolarDeviceInfo s) {
                 Log.d(TAG, "Device connected " + s.deviceId);
                 String msg = s.name + "\n" + s.deviceId;
-                textViewFW2.append(msg + "\n");
+                textViewFW2.append("\n" + msg);
 
                 Toast.makeText(classContext,
                         R.string.connected + " " + s.deviceId,
@@ -232,33 +235,34 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                 // Don't write if the information is empty
                 if (!fw.isEmpty()) {
                     String msg = "Firmware: " + fw.trim();
-                    textViewFW2.append(msg + "\n");
+                    textViewFW2.append("\n" + msg);
                 }
             }
 
             @Override
             public void batteryLevelReceived(String s, int i) {
-                Log.d(TAG, "Battery level " + s + " " + i);
+                Log.d(TAG, "Battery level 2 " + s + " " + i);
                 String msg = "Battery level: " + i;
 //                Toast.makeText(classContext, msg, Toast.LENGTH_LONG).show();
-                textViewFW2.append(msg + "\n");
+                textViewFW2.append("\n" + msg);
             }
 
             @Override
             public void hrNotificationReceived(String s,
                                                PolarHrData polarHrData) {
-                Log.d(TAG, "HR " + polarHrData.hr);
+                Log.d(TAG, "HR2 " + polarHrData.hr);
                 List<Integer> rrsMs = polarHrData.rrsMs;
                 StringBuilder msg = new StringBuilder();
-                msg.append(polarHrData.hr).append("\n");
                 for (int i : rrsMs) {
                     msg.append(i).append(",");
                 }
                 if (msg.toString().endsWith(",")) {
-                    msg = new StringBuilder(msg.substring(0, msg.length() - 1));
+                    msg.deleteCharAt(msg.length() - 1);
                 }
-                textViewHR2.setText(msg.toString());
                 plotter2.addValues(plot, polarHrData);
+                msg.append("\n").append(plotter2.getRrInfo());
+                textViewHR2.setText(String.valueOf(polarHrData.hr));
+                textViewRR2.setText(msg.toString());
             }
 
             @Override
@@ -288,10 +292,9 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
         plot.addSeries(plotter2.getRrSeries(), plotter2.getRrFormatter());
         plot.setRangeBoundaries(50, 100,
                 BoundaryMode.AUTO);
-        plot.setDomainBoundaries(now - DURATION, now,
-                BoundaryMode.FIXED);
+        plot.setDomainBoundaries(now - DURATION, now, BoundaryMode.FIXED);
         plot.setRangeStep(StepMode.INCREMENT_BY_VAL, 10);
-        plot.setDomainStep(StepMode.INCREMENT_BY_VAL, 10000);
+        plot.setDomainStep(StepMode.INCREMENT_BY_VAL, DURATION / 6.);
         // Make left labels be an integer (no decimal places)
         plot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.LEFT).
                 setFormat(new DecimalFormat("#"));
