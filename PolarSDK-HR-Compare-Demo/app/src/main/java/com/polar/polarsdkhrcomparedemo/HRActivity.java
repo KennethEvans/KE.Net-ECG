@@ -279,11 +279,11 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
         long now = new Date().getTime();
 
         plotter1 = new TimePlotter(this, DURATION, "HR1/RR1",
-                Color.RED, Color.BLUE);
+                Color.RED, Color.BLUE, true);
         plotter1.setListener(this);
         plotter2 = new TimePlotter(this, DURATION, "HR2/RR2",
                 Color.rgb(0xFF, 0x88, 0xAA),
-                Color.rgb(0x88, 0, 0x88));
+                Color.rgb(0x88, 0, 0x88), true);
         plotter2.setListener(this);
 
         plot.addSeries(plotter1.getHrSeries(), plotter1.getHrFormatter());

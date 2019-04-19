@@ -10,7 +10,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.androidplot.xy.BoundaryMode;
-import com.androidplot.xy.LineAndPointFormatter;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
@@ -156,12 +155,9 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
         long now = new Date().getTime();
         plotter = new TimePlotter(this, DURATION, "HR/RR", Color.RED,
-                Color.BLUE);
+                Color.BLUE, false);
         plotter.setListener(this);
 
-        // Turn off showing vertices
-        ((LineAndPointFormatter)plotter.getHrFormatter()).setVertexPaint(null);
-        ((LineAndPointFormatter)plotter.getRrFormatter()).setVertexPaint(null);
         plot.addSeries(plotter.getHrSeries(), plotter.getHrFormatter());
         plot.addSeries(plotter.getRrSeries(), plotter.getRrFormatter());
         plot.setRangeBoundaries(50, 100,

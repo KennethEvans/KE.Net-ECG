@@ -46,18 +46,17 @@ public class TimePlotter {
     private double totalRrTime;
 
     public TimePlotter(Context context, int duration, String title,
-                       Integer hrColor,
-                       Integer rrColor) {
+                       Integer hrColor, Integer rrColor, boolean showVertices) {
         this.context = context;
         this.duration = duration;
         this.title = title;  // Not used
-        hrFormatter = new LineAndPointFormatter(hrColor, hrColor,
-                null, null);
+        hrFormatter = new LineAndPointFormatter(hrColor,
+                showVertices ? hrColor : null, null, null);
         hrFormatter.setLegendIconEnabled(false);
         hrSeries = new SimpleXYSeries("HR");
 
-        rrFormatter = new LineAndPointFormatter(rrColor, rrColor,
-                null, null);
+        rrFormatter = new LineAndPointFormatter(rrColor,
+                showVertices ? rrColor : null, null, null);
         rrFormatter.setLegendIconEnabled(false);
         rrSeries = new SimpleXYSeries("RR");
     }
