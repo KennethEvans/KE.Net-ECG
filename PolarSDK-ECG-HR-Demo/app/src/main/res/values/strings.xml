@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Polar HR</string>
+    <string name="app_name">Polar HR Demo</string>
     <string name="ecg_name">ECG</string>
     <string name="hr_name">HR / RR</string>
     <string name="hr_title">HR and RR vs. Time (for %1d min)</string>
