@@ -2,7 +2,7 @@
     <string name="app_name">Polar HR Compare</string>
     <string name="hr_name">HR Compare</string>
     <string name="hr_title">HR and RR vs. Time (for %1d min)</string>
-    <string name="hr_range_title">HR, /sec RR, ms/10</string>
+    <string name="hr_range_title">HR, /s RR, ms/10</string>
     <string name="disconnect">DISCONNECT</string>
     <string name="connect">CONNECT</string>
     <string name="connecting">Connecting to device</string>

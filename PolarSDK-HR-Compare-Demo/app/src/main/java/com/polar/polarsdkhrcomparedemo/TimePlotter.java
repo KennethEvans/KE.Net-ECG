@@ -20,11 +20,19 @@ import polar.com.sdk.api.model.PolarHrData;
  */
 @SuppressWarnings("WeakerAccess")
 public class TimePlotter {
-    private String title;
     private String TAG = "Polar_Plotter";
+    private String title;
+    /**
+     * Scale the RR values by RR_SCALE to use the same axis. (Could implement
+     * NormedXYSeries and use two axes)
+     */
     private double RR_SCALE = .1;
     private PlotterListener listener;
     private Context context;
+
+    /**
+     * The duration of the data to be retained.
+     */
     private int duration;
     private XYSeriesFormatter hrFormatter;
     private XYSeriesFormatter rrFormatter;
@@ -33,6 +41,8 @@ public class TimePlotter {
 
     private double startRrTime = Double.NEGATIVE_INFINITY;
     private double lastRrTime;
+    private double currentUpdateTime;
+    private double lastUpdateTime;
     private double totalRrTime;
 
     public TimePlotter(Context context, int duration, String title,
@@ -41,7 +51,6 @@ public class TimePlotter {
         this.context = context;
         this.duration = duration;
         this.title = title;  // Not used
-        Date now = new Date();
         hrFormatter = new LineAndPointFormatter(hrColor, hrColor,
                 null, null);
         hrFormatter.setLegendIconEnabled(false);
@@ -50,7 +59,7 @@ public class TimePlotter {
         rrFormatter = new LineAndPointFormatter(rrColor, rrColor,
                 null, null);
         rrFormatter.setLegendIconEnabled(false);
-        rrSeries = new SimpleXYSeries("HR");
+        rrSeries = new SimpleXYSeries("RR");
     }
 
     public SimpleXYSeries getHrSeries() {
@@ -72,14 +81,16 @@ public class TimePlotter {
     /**
      * Implements a strip chart adding new data at the end.
      *
+     * @param plot        The associated XYPlot.
      * @param polarHrData The HR data that came in.
      */
     public void addValues(XYPlot plot, PolarHrData polarHrData) {
-        Date date = new Date();
-        long now = date.getTime();
+        long now = new Date().getTime();
+        currentUpdateTime = now;
+        // Make the plot move forward
         long start = now - duration;
         plot.setDomainBoundaries(start, now, BoundaryMode.FIXED);
-        // Clear out expired values
+        // Clear out expired HR values
         if (hrSeries.size() > 0) {
             while (hrSeries.getX(0).longValue() < start) {
                 hrSeries.removeFirst();
@@ -89,45 +100,66 @@ public class TimePlotter {
         hrSeries.addLast(now, polarHrData.hr);
 
         // Do RR
-        // We don't know at what now the RR intervals start.  All we know is
-        // the now the data arrived (the current now, date). This
-        // implementation assumes they end at the current now, and spaces them
-        // out in the past accordingly.  This seems to get the
-        // relative positioning reasonably well.
+        // We don't know at what time the RR intervals start.  All we know is
+        // the time the data arrived (now) and that the intervals ended
+        // between the previous update time and now.
 
-        // Clear out expired values
+        // Clear out expired RR values
         if (rrSeries.size() > 0) {
             while (rrSeries.getX(0).longValue() < start) {
                 rrSeries.removeFirst();
             }
         }
-        // Scale the RR values by this to use the same axis. (Could implement
-        // NormedXYSeries and use two axes)
         List<Integer> rrsMs = polarHrData.rrsMs;
         int nRrVals = rrsMs.size();
-        if (nRrVals > 0) {
-            double totalRR = 0;
+        double[] tVals = new double[nRrVals];
+        Integer[] rrVals = new Integer[nRrVals];
+        rrVals = rrsMs.toArray(rrVals);
+        // Find the sum of the RR intervals
+        double totalRR = 0;
+        for (int i = 0; i < nRrVals; i++) {
+            totalRR += rrVals[i];
+        }
+        // First time
+        if (Double.isInfinite(startRrTime)) {
+            startRrTime = lastRrTime = lastUpdateTime = now - totalRR;
+            totalRrTime = 0;
+        }
+        totalRrTime += totalRR;
+        Log.d(TAG, "lastRrTime=" + lastRrTime
+                + " totalRR=" + totalRR
+                + " elapsed=" + (lastRrTime - startRrTime)
+                + " totalRrTime=" + totalRrTime);
+
+        double rr;
+        double t = lastRrTime;
+        for (int i = 0; i < nRrVals; i++) {
+            rr = rrVals[i];
+            t += rr;
+            tVals[i] = t;
+        }
+        // Keep them in this interval
+        if (nRrVals > 0 && tVals[0] < lastUpdateTime) {
+            double deltaT = lastUpdateTime = tVals[0];
+            t += deltaT;
             for (int i = 0; i < nRrVals; i++) {
-                totalRR += rrsMs.get(i);
-            }
-            if (Double.isInfinite(startRrTime)) {
-                startRrTime = now - totalRR;
-                totalRrTime = 0;
-            }
-            lastRrTime = now;
-            totalRrTime += totalRR;
-            Log.d(TAG, "lastRrTime=" + lastRrTime
-                    + " totalRR=" + totalRR
-                    + " elapsed=" + (lastRrTime - startRrTime)
-                    + " totalRrTime=" + totalRrTime);
-            totalRR *= RR_SCALE;
-            int index = 0;
-            double rr;
-            for (int i = nRrVals - 1; i >= 0; i--) {
-                rr = RR_SCALE * rrsMs.get(index++);
-                rrSeries.addLast(now - totalRR, rr);
+                tVals[i] += deltaT;
             }
         }
+        // Keep them from being in the future
+        if (t > now) {
+            double deltaT = t - now;
+            for (int i = 0; i < nRrVals; i++) {
+                tVals[i] -= deltaT;
+            }
+        }
+        // Add to the series
+        for (int i = 0; i < nRrVals; i++) {
+            rr = rrVals[i];
+            rrSeries.addLast(tVals[i], RR_SCALE * rr);
+            lastRrTime = tVals[i];
+        }
+        lastUpdateTime = now;
         listener.update();
     }
 
@@ -135,8 +167,8 @@ public class TimePlotter {
         double elapsed = .001 * (lastRrTime - startRrTime);
         double total = .001 * totalRrTime;
         double ratio = total / elapsed;
-        return "Tot=" + String.format(Locale.US, "%.2f", elapsed)
-                + " RR=" + String.format(Locale.US, "%.2f", total)
+        return "Tot=" + String.format(Locale.US, "%.2f s", elapsed)
+                + " RR=" + String.format(Locale.US, "%.2f s", total)
                 + " (" + String.format(Locale.US, "%.2f", ratio) + ")";
     }
 
