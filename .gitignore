@@ -6,4 +6,8 @@ local.properties
 build
 captures
 .externalNativeBuild
-test/
+PolarBleSdkTestApp/
+polar-sdk-android/
+polar-sdk-android-no-filter/
+polar-sdk-android-no-polar-filter/
+PolarSDK-Exercise-Demo/
