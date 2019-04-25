@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 
 import polar.com.sdk.api.model.PolarHrData;
+import polar.com.sdk.api.model.PolarOhrPPIData;
 
 /**
  * Implements two series for HR and RR using time for the x values.
@@ -94,9 +95,11 @@ public class TimePlotter {
             while (hrSeries.getX(0).longValue() < start) {
                 hrSeries.removeFirst();
             }
-            hrSeries.addLast(now, polarHrData.hr);
         }
         hrSeries.addLast(now, polarHrData.hr);
+
+        // Return if RR is not available (e.g. OH1)
+        if (!polarHrData.rrAvailable) return;
 
         // Do RR
         // We don't know at what time the RR intervals start.  All we know is
@@ -114,6 +117,97 @@ public class TimePlotter {
         double[] tVals = new double[nRrVals];
         Integer[] rrVals = new Integer[nRrVals];
         rrVals = rrsMs.toArray(rrVals);
+        // Find the sum of the RR intervals
+        double totalRR = 0;
+        for (int i = 0; i < nRrVals; i++) {
+            totalRR += rrVals[i];
+        }
+        // First time
+        if (Double.isInfinite(startRrTime)) {
+            startRrTime = lastRrTime = lastUpdateTime = now - totalRR;
+            totalRrTime = 0;
+        }
+        totalRrTime += totalRR;
+        Log.d(TAG, "lastRrTime=" + lastRrTime
+                + " totalRR=" + totalRR
+                + " elapsed=" + (lastRrTime - startRrTime)
+                + " totalRrTime=" + totalRrTime);
+
+        double rr;
+        double t = lastRrTime;
+        for (int i = 0; i < nRrVals; i++) {
+            rr = rrVals[i];
+            t += rr;
+            tVals[i] = t;
+        }
+        // Keep them in this interval
+        if (nRrVals > 0 && tVals[0] < lastUpdateTime) {
+            double deltaT = lastUpdateTime = tVals[0];
+            t += deltaT;
+            for (int i = 0; i < nRrVals; i++) {
+                tVals[i] += deltaT;
+            }
+        }
+        // Keep them from being in the future
+        if (t > now) {
+            double deltaT = t - now;
+            for (int i = 0; i < nRrVals; i++) {
+                tVals[i] -= deltaT;
+            }
+        }
+        // Add to the series
+        for (int i = 0; i < nRrVals; i++) {
+            rr = rrVals[i];
+            rrSeries.addLast(tVals[i], RR_SCALE * rr);
+            lastRrTime = tVals[i];
+        }
+        lastUpdateTime = now;
+        listener.update();
+    }
+
+    /**
+     * Implements a strip chart adding new data at the end using PPI data.
+     * The data consists of a timestamp, which seems to be 0, and a list of
+     * samples with hr, ppi, and some other items.  Even
+     * though the PPI samples have a hr, it appears to be 0.  This just does the
+     * RR values (using ppi).  The logic is the same as for handling RR for
+     * HR data, except the array of RR values is the ppi values from the
+     * samples.  It does not do HR since it is zero.
+     *
+     * @param plot    The associated XYPlot.
+     * @param ppiData The PPI data that came in.
+     */
+    public void addValues(XYPlot plot, PolarOhrPPIData ppiData) {
+        Log.d(TAG, "addValues PPG: nSamples=" + ppiData.samples.size());
+        long now = new Date().getTime();
+        currentUpdateTime = now;
+        // Make the plot move forward
+        long start = now - duration;
+        plot.setDomainBoundaries(start, now, BoundaryMode.FIXED);
+
+        // Don't do HR
+
+        // Do RR
+        // We don't know at what time the RR intervals start.  All we know is
+        // the time the data arrived (now) and that the intervals ended
+        // between the previous update time and now.
+
+        // Clear out expired RR values
+        if (rrSeries.size() > 0) {
+            while (rrSeries.getX(0).longValue() < start) {
+                rrSeries.removeFirst();
+            }
+        }
+
+        List<PolarOhrPPIData.PolarOhrPPISample> samples = ppiData.samples;
+        int nRrVals = samples.size();
+        double[] tVals = new double[nRrVals];
+        Integer[] rrVals = new Integer[nRrVals];
+        for (int i = 0; i < nRrVals; i++) {
+            rrVals[i] = samples.get(i).ppi;
+        }
+
+        // Logic from here on is the same as for HR data
         // Find the sum of the RR intervals
         double totalRR = 0;
         for (int i = 0; i < nRrVals; i++) {

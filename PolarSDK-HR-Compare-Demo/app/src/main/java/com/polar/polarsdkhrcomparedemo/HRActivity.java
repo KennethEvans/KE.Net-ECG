@@ -18,12 +18,16 @@ import java.text.DecimalFormat;
 import java.util.Date;
 import java.util.List;
 
+import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Action;
+import io.reactivex.functions.Consumer;
 import polar.com.sdk.api.PolarBleApi;
 import polar.com.sdk.api.PolarBleApiCallback;
 import polar.com.sdk.api.PolarBleApiDefaultImpl;
 import polar.com.sdk.api.model.PolarDeviceInfo;
 import polar.com.sdk.api.model.PolarHrData;
+import polar.com.sdk.api.model.PolarOhrPPIData;
 
 public class HRActivity extends AppCompatActivity implements PlotterListener {
     private static final int DURATION = 60000;  // In ms
@@ -37,6 +41,8 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
     private Disposable ecgDisposable = null;
     private Context classContext = this;
     private String DEVICE_ID_1, DEVICE_ID_2;
+    private boolean usePpg1, usePpg2;
+    Disposable ppiDisposable1, ppiDisposable2;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -58,19 +64,23 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
         api1 = PolarBleApiDefaultImpl.defaultImplementation(this,
                 PolarBleApi.FEATURE_BATTERY_INFO |
                         PolarBleApi.FEATURE_DEVICE_INFO |
-                        PolarBleApi.FEATURE_HR);
+                        PolarBleApi.FEATURE_HR |
+                        PolarBleApi.FEATURE_POLAR_SENSOR_STREAMING
+        );
         api1.setPolarFilter(false);
         api1.setApiCallback(new PolarBleApiCallback() {
             @Override
             public void blePowerStateChanged(boolean b) {
-                Log.d(TAG, "BluetoothStateChanged " + b);
+                Log.d(TAG, "BluetoothStateChanged 1 " + b);
             }
 
             @Override
             public void polarDeviceConnected(PolarDeviceInfo s) {
-                Log.d(TAG, "Device connected " + s.deviceId);
+                Log.d(TAG, "Device connected 1 " + s.deviceId);
                 String msg = s.name + "\n" + s.deviceId;
                 textViewFW1.append("\n" + msg);
+                usePpg1 = s.name.contains("OH1");
+                Log.d(TAG, "  usePpg1=" + usePpg1);
 
                 Toast.makeText(classContext,
                         R.string.connected + " " + s.deviceId,
@@ -79,33 +89,65 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
             @Override
             public void polarDeviceConnecting(PolarDeviceInfo polarDeviceInfo) {
-                Log.d(TAG, "CONNECTING: " + polarDeviceInfo.deviceId);
+                Log.d(TAG, "CONNECTING 1: " + polarDeviceInfo.deviceId);
             }
 
             @Override
             public void polarDeviceDisconnected(PolarDeviceInfo s) {
-                Log.d(TAG, "Device disconnected " + s);
-
+                Log.d(TAG, "Device disconnected 1 " + s);
+                ppiDisposable1 = null;
             }
 
             @Override
             public void ecgFeatureReady(String s) {
-                Log.d(TAG, "ECG Feature ready " + s);
+                Log.d(TAG, "ECG Feature ready 1 " + s);
             }
 
             @Override
             public void accelerometerFeatureReady(String s) {
-                Log.d(TAG, "ACC Feature ready " + s);
+                Log.d(TAG, "ACC Feature ready 1" + s);
             }
 
             @Override
             public void ppgFeatureReady(String s) {
-                Log.d(TAG, "PPG Feature ready " + s);
+                Log.d(TAG, "PPG Feature ready 1 " + s);
             }
 
             @Override
             public void ppiFeatureReady(String s) {
-                Log.d(TAG, "PPI Feature ready " + s);
+                Log.d(TAG, "PPI Feature ready 1 " + s);
+                if (!usePpg1) return;
+                ppiDisposable1 =
+                        api1.startOhrPPIStreaming(DEVICE_ID_1).observeOn(AndroidSchedulers.mainThread()).subscribe(
+                                new Consumer<PolarOhrPPIData>() {
+                                    @Override
+                                    public void accept(PolarOhrPPIData ppiData) throws Exception {
+                                        plotter1.addValues(plot, ppiData);
+                                        for (PolarOhrPPIData.PolarOhrPPISample sample : ppiData.samples) {
+                                            Log.d(TAG,
+                                                    "1 hr: " + sample.hr +
+                                                            " ppi: " + sample.ppi
+                                                            + " blocker: "
+                                                            + sample.blockerBit
+                                                            + " errorEstimate: "
+                                                            + sample.errorEstimate);
+                                        }
+                                    }
+                                },
+                                new Consumer<Throwable>() {
+                                    @Override
+                                    public void accept(Throwable throwable) throws Exception {
+                                        Log.e(TAG,
+                                                "PPI failed for device 1: " + throwable.getLocalizedMessage());
+                                    }
+                                },
+                                new Action() {
+                                    @Override
+                                    public void run() throws Exception {
+                                        Log.d(TAG, "PPI complete for device 1");
+                                    }
+                                }
+                        );
             }
 
             @Override
@@ -115,12 +157,12 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
             @Override
             public void hrFeatureReady(String s) {
-                Log.d(TAG, "HR Feature ready " + s);
+                Log.d(TAG, "HR Feature ready 1 " + s);
             }
 
             @Override
             public void fwInformationReceived(String s, String fw) {
-                Log.d(TAG, "Firmware: " + s + " " + fw.trim());
+                Log.d(TAG, "Firmware 1: " + s + " " + fw.trim());
                 // Don't write if the information is empty
                 if (!fw.isEmpty()) {
                     String msg = "Firmware: " + fw.trim();
@@ -156,7 +198,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
             @Override
             public void polarFtpFeatureReady(String s) {
-                Log.d(TAG, "Polar FTP ready " + s);
+                Log.d(TAG, "Polar FTP ready 1 " + s);
             }
         });
         if (DEVICE_ID_1 != null && !DEVICE_ID_1.isEmpty()) {
@@ -169,19 +211,23 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
         api2 = PolarBleApiDefaultImpl.defaultImplementation(this,
                 PolarBleApi.FEATURE_BATTERY_INFO |
                         PolarBleApi.FEATURE_DEVICE_INFO |
-                        PolarBleApi.FEATURE_HR);
+                        PolarBleApi.FEATURE_HR |
+                        PolarBleApi.FEATURE_POLAR_SENSOR_STREAMING
+        );
         api2.setPolarFilter(false);
         api2.setApiCallback(new PolarBleApiCallback() {
             @Override
             public void blePowerStateChanged(boolean b) {
-                Log.d(TAG, "BluetoothStateChanged " + b);
+                Log.d(TAG, "BluetoothStateChanged 2 " + b);
             }
 
             @Override
             public void polarDeviceConnected(PolarDeviceInfo s) {
-                Log.d(TAG, "Device connected " + s.deviceId);
+                Log.d(TAG, "Device connected 2 " + s.deviceId);
                 String msg = s.name + "\n" + s.deviceId;
                 textViewFW2.append("\n" + msg);
+                usePpg2 = s.name.contains("OH1");
+                Log.d(TAG, "  usePpg2=" + usePpg2);
 
                 Toast.makeText(classContext,
                         R.string.connected + " " + s.deviceId,
@@ -190,33 +236,65 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
             @Override
             public void polarDeviceConnecting(PolarDeviceInfo polarDeviceInfo) {
-                Log.d(TAG, "CONNECTING: " + polarDeviceInfo.deviceId);
+                Log.d(TAG, "CONNECTING 2: " + polarDeviceInfo.deviceId);
             }
 
             @Override
             public void polarDeviceDisconnected(PolarDeviceInfo s) {
-                Log.d(TAG, "Device disconnected " + s);
-
+                Log.d(TAG, "Device disconnected 2 " + s);
+                ppiDisposable2 = null;
             }
 
             @Override
             public void ecgFeatureReady(String s) {
-                Log.d(TAG, "ECG Feature ready " + s);
+                Log.d(TAG, "ECG Feature ready 2 " + s);
             }
 
             @Override
             public void accelerometerFeatureReady(String s) {
-                Log.d(TAG, "ACC Feature ready " + s);
+                Log.d(TAG, "ACC Feature ready 2 " + s);
             }
 
             @Override
             public void ppgFeatureReady(String s) {
-                Log.d(TAG, "PPG Feature ready " + s);
+                Log.d(TAG, "PPG Feature ready 2 " + s);
             }
 
             @Override
             public void ppiFeatureReady(String s) {
-                Log.d(TAG, "PPI Feature ready " + s);
+                Log.d(TAG, "PPI Feature ready 2 " + s);
+                if (!usePpg2) return;
+                ppiDisposable2 =
+                        api2.startOhrPPIStreaming(DEVICE_ID_2).observeOn(AndroidSchedulers.mainThread()).subscribe(
+                                new Consumer<PolarOhrPPIData>() {
+                                    @Override
+                                    public void accept(PolarOhrPPIData ppiData) throws Exception {
+                                        plotter2.addValues(plot, ppiData);
+                                        for (PolarOhrPPIData.PolarOhrPPISample sample : ppiData.samples) {
+                                            Log.d(TAG,
+                                                    "2 hr: " + sample.hr +
+                                                            " ppi: " + sample.ppi
+                                                            + " blocker: "
+                                                            + sample.blockerBit
+                                                            + " errorEstimate: "
+                                                            + sample.errorEstimate);
+                                        }
+                                    }
+                                },
+                                new Consumer<Throwable>() {
+                                    @Override
+                                    public void accept(Throwable throwable) throws Exception {
+                                        Log.e(TAG,
+                                                "PPI failed for device 2: " + throwable.getLocalizedMessage());
+                                    }
+                                },
+                                new Action() {
+                                    @Override
+                                    public void run() throws Exception {
+                                        Log.d(TAG, "PPI complete for device 2");
+                                    }
+                                }
+                        );
             }
 
             @Override
@@ -226,12 +304,12 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
 
             @Override
             public void hrFeatureReady(String s) {
-                Log.d(TAG, "HR Feature ready " + s);
+                Log.d(TAG, "HR Feature ready 2 " + s);
             }
 
             @Override
             public void fwInformationReceived(String s, String fw) {
-                Log.d(TAG, "Firmware: " + s + " " + fw.trim());
+                Log.d(TAG, "Firmware 2: " + s + " " + fw.trim());
                 // Don't write if the information is empty
                 if (!fw.isEmpty()) {
                     String msg = "Firmware: " + fw.trim();
