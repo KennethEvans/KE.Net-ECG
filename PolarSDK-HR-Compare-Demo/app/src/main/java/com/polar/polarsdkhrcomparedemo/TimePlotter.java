@@ -199,6 +199,9 @@ public class TimePlotter {
             }
         }
 
+        // Make an array
+        // Assume the oldest is first as for RR values in the Heart
+        // characteristic
         List<PolarOhrPPIData.PolarOhrPPISample> samples = ppiData.samples;
         int nRrVals = samples.size();
         double[] tVals = new double[nRrVals];
