@@ -1,13 +1,17 @@
 package net.kenevans.polar.polarecg;
 
 import android.content.Context;
-import android.graphics.Paint;
+import android.util.Log;
 
-import com.androidplot.xy.AdvancedLineAndPointRenderer;
+import com.androidplot.xy.BoundaryMode;
+import com.androidplot.xy.LineAndPointFormatter;
 import com.androidplot.xy.SimpleXYSeries;
-import com.androidplot.xy.XYSeries;
-import java.util.Arrays;
+import com.androidplot.xy.XYPlot;
+import com.androidplot.xy.XYSeriesFormatter;
 
+import polar.com.sdk.api.model.PolarEcgData;
+
+@SuppressWarnings("WeakerAccess")
 public class Plotter {
 
     String title;
@@ -15,72 +19,71 @@ public class Plotter {
     private PlotterListener listener;
     private Context context;
     private Number[] plotNumbers = new Number[500];
-    private FadeFormatter formatter;
-    private XYSeries series;
-    private int dataIndex;
+    private XYSeriesFormatter formatter;
+    private SimpleXYSeries series;
+    private long dataIndex;
+    private int dataSize;
 
 
-    public Plotter(Context context, String title){
+    public Plotter(Context context, int dataSize, String title,
+                   Integer lineColor, boolean showVertices) {
         this.context = context;
         this.title = title;
+        this.dataSize = dataSize;
+        this.dataIndex = 0;
 
-        for(int i = 0; i < plotNumbers.length - 1; i++){
-            plotNumbers[i] = 60;
-        }
-
-        formatter = new FadeFormatter(800);
+        formatter = new LineAndPointFormatter(lineColor,
+                showVertices ? lineColor : null, null, null);
         formatter.setLegendIconEnabled(false);
 
-        series = new SimpleXYSeries(Arrays.asList(plotNumbers), SimpleXYSeries.ArrayFormat.Y_VALS_ONLY, title);
+        series = new SimpleXYSeries(title);
     }
 
-    public SimpleXYSeries getSeries(){
-        return (SimpleXYSeries) series;
+    public SimpleXYSeries getSeries() {
+        return series;
     }
 
-    public FadeFormatter getFormatter(){
+    public XYSeriesFormatter getFormatter() {
         return formatter;
     }
 
-    public void sendSingleSample(float mV){
-        plotNumbers[dataIndex] = mV;
-        if(dataIndex >= plotNumbers.length - 1){
-            dataIndex = 0;
-        }
-        if(dataIndex < plotNumbers.length - 1){
-            plotNumbers[dataIndex + 1] = null;
-        }
+    /**
+     * Implements a strip chart adding new data at the end.
+     *
+     * @param plot         The associated XYPlot.
+     * @param polarEcgData The data that came in.
+     */
+    public void addValues(XYPlot plot, PolarEcgData polarEcgData) {
+        Log.d(TAG,
+                "addValues: dataIndex=" + dataIndex + " seriesSize=" + series.size());
+        int nSamples = polarEcgData.samples.size();
+        if (nSamples == 0) return;
 
-        ((SimpleXYSeries) series).setModel(Arrays.asList(plotNumbers), SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
-        dataIndex++;
+        // Add the new values, removing old values if needed
+        for (Integer val : polarEcgData.samples) {
+            if (series.size() >= dataSize) {
+                series.removeFirst();
+            }
+            // Convert from  μV to mV
+            series.addLast(dataIndex++, .001 * val);
+        }
+        updatePlot(plot);
+    }
+
+    private void updatePlot(XYPlot plot) {
+        long plotMin, plotMax;
+        if (dataIndex < dataSize) {
+            plotMin = 0;
+            plotMax = dataSize;
+        } else {
+            plotMin = dataIndex - dataSize;
+            plotMax = dataIndex;
+        }
+        plot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
         listener.update();
     }
 
-    public void setListener(PlotterListener listener){
+    public void setListener(PlotterListener listener) {
         this.listener = listener;
-    }
-
-    //Custom paint stroke to generate a "fade" effect
-    public static class FadeFormatter extends AdvancedLineAndPointRenderer.Formatter {
-        private int trailSize;
-
-        public FadeFormatter(int trailSize) {
-            this.trailSize = trailSize;
-        }
-
-        @Override
-        public Paint getLinePaint(int thisIndex, int latestIndex, int seriesSize) {
-            // offset from the latest index:
-            int offset;
-            if(thisIndex > latestIndex) {
-                offset = latestIndex + (seriesSize - thisIndex);
-            } else {
-                offset =  latestIndex - thisIndex;
-            }
-            float scale = 255f / trailSize;
-            int alpha = (int) (255 - (offset * scale));
-            getLinePaint().setAlpha(alpha > 0 ? alpha : 0);
-            return getLinePaint();
-        }
     }
 }

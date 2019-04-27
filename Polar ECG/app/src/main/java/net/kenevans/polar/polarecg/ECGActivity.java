@@ -1,9 +1,11 @@
 package net.kenevans.polar.polarecg;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,7 +31,7 @@ import polar.com.sdk.api.model.PolarHrData;
 import polar.com.sdk.api.model.PolarSensorSetting;
 
 public class ECGActivity extends AppCompatActivity implements PlotterListener {
-
+    private static final int POINTS_TO_PLOT = 1000;
     private XYPlot plot;
     private Plotter plotter;
 
@@ -141,14 +143,28 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         });
         api.connectToPolarDevice(DEVICE_ID);
 
-        plotter = new Plotter(this, "ECG");
+        DisplayMetrics displayMetrics = this.getResources().getDisplayMetrics();
+        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
+        float dpWidth = displayMetrics.widthPixels / displayMetrics.density;
+        Log.d(TAG, "dpWidth=" + dpWidth + " dpHeight=" + dpHeight);
+        Log.d(TAG, "widthPixels=" + displayMetrics.widthPixels +
+                " heightPixels=" + displayMetrics.heightPixels);
+        Log.d(TAG, "density=" + displayMetrics.density);
+        Log.d(TAG, "10dp=" + 10 / displayMetrics.density + " pixels");
+
+        plotter = new Plotter(this, POINTS_TO_PLOT, "ECG", Color.RED, false);
         plotter.setListener(this);
 
         plot.addSeries(plotter.getSeries(), plotter.getFormatter());
-        plot.setRangeBoundaries(-3.3, 3.3, BoundaryMode.FIXED);
-        plot.setRangeStep(StepMode.INCREMENT_BY_VAL, .5);
-        plot.setDomainBoundaries(0, 500, BoundaryMode.FIXED);
-        plot.setDomainStep(StepMode.INCREMENT_BY_VAL, 26.05);
+        plot.setRangeBoundaries(-3.3 * POINTS_TO_PLOT / 500,
+                3.3 * POINTS_TO_PLOT / 500, BoundaryMode.FIXED);
+        plot.setRangeStep(StepMode.INCREMENT_BY_VAL, .5 * POINTS_TO_PLOT / 500);
+        plot.setDomainBoundaries(0, POINTS_TO_PLOT, BoundaryMode.FIXED);
+        plot.setDomainStep(StepMode.INCREMENT_BY_VAL,
+                26.05 * POINTS_TO_PLOT / 500);
+
+        Log.d(TAG, "plotWidth=" + plot.getWidth() +
+                " plotHeight=" + plot.getHeight());
     }
 
     @Override
@@ -162,31 +178,50 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             ecgDisposable =
                     api.requestEcgSettings(DEVICE_ID).toFlowable().flatMap(new Function<PolarSensorSetting, Publisher<PolarEcgData>>() {
                         @Override
-                        public Publisher<PolarEcgData> apply(PolarSensorSetting sensorSetting) throws Exception {
+                        public Publisher<PolarEcgData> apply(PolarSensorSetting sensorSetting) {
+//                            Log.d(TAG, "ecgDisposable requestEcgSettings " +
+//                                    "apply");
+//                            Log.d(TAG,
+//                                    "sampleRate=" + sensorSetting
+//                                    .maxSettings().settings.
+//                                            get(PolarSensorSetting
+//                                            .SettingType.SAMPLE_RATE) +
+//                                            " resolution=" + sensorSetting
+//                                            .maxSettings().settings.
+//                                            get(PolarSensorSetting
+//                                            .SettingType.RESOLUTION) +
+//                                            " range=" + sensorSetting
+//                                            .maxSettings().settings.
+//                                            get(PolarSensorSetting
+//                                            .SettingType.RANGE));
                             return api.startEcgStreaming(DEVICE_ID,
                                     sensorSetting.maxSettings());
                         }
                     }).observeOn(AndroidSchedulers.mainThread()).subscribe(
                             new Consumer<PolarEcgData>() {
                                 @Override
-                                public void accept(PolarEcgData polarEcgData) throws Exception {
-                                    double deltaT =
-                                            .000000001 * (polarEcgData.timeStamp - time0);
-                                    time0 = polarEcgData.timeStamp;
-                                    int nSamples = polarEcgData.samples.size();
-                                    double samplesPerSec = nSamples / deltaT;
-                                    Log.d(TAG,
-                                            "ecg update: deltaT=" + String.format("%.3f", deltaT) +
-                                                    " nSamples=" + nSamples +
-                                                    " samplesPerSec=" + String.format("%.3f", samplesPerSec));
-                                    for (Integer data : polarEcgData.samples) {
-                                        plotter.sendSingleSample((float) ((float) data / 1000.0));
-                                    }
+                                public void accept(PolarEcgData polarEcgData) {
+//                                    double deltaT =
+//                                            .000000001 * (polarEcgData
+//                                            .timeStamp - time0);
+//                                    time0 = polarEcgData.timeStamp;
+//                                    int nSamples = polarEcgData.samples
+//                                    .size();
+//                                    double samplesPerSec = nSamples / deltaT;
+//                                    Log.d(TAG,
+//                                            "ecg update:" +
+//                                                    " deltaT=" + String
+//                                                    .format("%.3f", deltaT) +
+//                                                    " nSamples=" + nSamples +
+//                                                    " samplesPerSec=" +
+//                                                    String.format("%.3f",
+//                                                    samplesPerSec));
+                                    plotter.addValues(plot, polarEcgData);
                                 }
                             },
                             new Consumer<Throwable>() {
                                 @Override
-                                public void accept(Throwable throwable) throws Exception {
+                                public void accept(Throwable throwable) {
                                     Log.e(TAG,
                                             "" + throwable.getLocalizedMessage());
                                     ecgDisposable = null;
@@ -194,7 +229,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                             },
                             new Action() {
                                 @Override
-                                public void run() throws Exception {
+                                public void run() {
                                     Log.d(TAG, "complete");
                                 }
                             }
@@ -208,6 +243,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 
     @Override
     public void update() {
+//        Log.d(TAG, "plotWidth=" + plot.getWidth() +
+//                " plotHeight=" + plot.getHeight());
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
