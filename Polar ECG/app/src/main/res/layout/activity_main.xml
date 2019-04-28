@@ -13,17 +13,17 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="64dp"
         android:layout_marginEnd="64dp"
-        android:layout_marginBottom="160dp"
         android:background="@color/colorPrimary"
         android:onClick="onClickChangeID"
         android:padding="8dp"
         android:text="@string/set_id_button"
         android:textColor="@color/colorAccent"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toTopOf="@+id/buttonConnect"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"/>
+        />
 
     <Button
         android:id="@+id/buttonConnect"
@@ -37,11 +37,11 @@
         android:padding="8dp"
         android:text="@string/connect"
         android:textColor="@color/colorAccent"
+        app:layout_constraintTop_toBottomOf="@+id/buttonSetID"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="1.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/buttonSetID"
         />
 
 </android.support.constraint.ConstraintLayout>

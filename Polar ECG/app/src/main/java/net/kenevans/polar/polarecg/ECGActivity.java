@@ -1,11 +1,10 @@
 package net.kenevans.polar.polarecg;
 
-import android.content.Context;
 import android.graphics.Color;
+import android.graphics.RectF;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -17,13 +16,14 @@ import com.polar.polarecg.R;
 
 import org.reactivestreams.Publisher;
 
+import java.util.Date;
+
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import polar.com.sdk.api.PolarBleApi;
-import polar.com.sdk.api.PolarBleApiCallback;
 import polar.com.sdk.api.PolarBleApiDefaultImpl;
 import polar.com.sdk.api.model.PolarDeviceInfo;
 import polar.com.sdk.api.model.PolarEcgData;
@@ -31,15 +31,15 @@ import polar.com.sdk.api.model.PolarHrData;
 import polar.com.sdk.api.model.PolarSensorSetting;
 
 public class ECGActivity extends AppCompatActivity implements PlotterListener {
-    private static final int POINTS_TO_PLOT = 1000;
-    private XYPlot plot;
-    private Plotter plotter;
+    // The total number of points = 26 * total large blocks desired
+    private static final int POINTS_TO_PLOT = 520;
+    private XYPlot mPlot;
+    private Plotter mPlotter;
 
-    TextView textViewHR, textViewFW;
+    TextView mTextViewHR, mTextViewFW;
     private String TAG = "Polar_ECGActivity";
-    public PolarBleApi api;
-    private Disposable ecgDisposable = null;
-    private Context classContext = this;
+    public PolarBleApi mApi;
+    private Disposable mEcgDisposable = null;
     private String DEVICE_ID;
 
     private long time0;
@@ -49,17 +49,17 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_ecg);
         DEVICE_ID = getIntent().getStringExtra("id");
-        textViewHR = findViewById(R.id.info);
-        textViewFW = findViewById(R.id.fw);
+        mTextViewHR = findViewById(R.id.info);
+        mTextViewFW = findViewById(R.id.fw);
 
-        plot = findViewById(R.id.plot);
+        mPlot = findViewById(R.id.plot);
 
-        api = PolarBleApiDefaultImpl.defaultImplementation(this,
+        mApi = PolarBleApiDefaultImpl.defaultImplementation(this,
                 PolarBleApi.FEATURE_POLAR_SENSOR_STREAMING |
                         PolarBleApi.FEATURE_BATTERY_INFO |
                         PolarBleApi.FEATURE_DEVICE_INFO |
                         PolarBleApi.FEATURE_HR);
-        api.setApiCallback(new PolarBleApiCallback() {
+        mApi.setApiCallback(new PolarBleApiCallbackAdapter() {
             @Override
             public void blePowerStateChanged(boolean b) {
                 Log.d(TAG, "BluetoothStateChanged " + b);
@@ -68,45 +68,19 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             @Override
             public void polarDeviceConnected(PolarDeviceInfo s) {
                 Log.d(TAG, "Device connected " + s.deviceId);
-                Toast.makeText(classContext, R.string.connected,
+                Toast.makeText(ECGActivity.this, R.string.connected,
                         Toast.LENGTH_SHORT).show();
-            }
-
-            @Override
-            public void polarDeviceConnecting(PolarDeviceInfo polarDeviceInfo) {
-
             }
 
             @Override
             public void polarDeviceDisconnected(PolarDeviceInfo s) {
                 Log.d(TAG, "Device disconnected " + s);
-
             }
 
             @Override
             public void ecgFeatureReady(String s) {
                 Log.d(TAG, "ECG Feature ready " + s);
                 streamECG();
-            }
-
-            @Override
-            public void accelerometerFeatureReady(String s) {
-                Log.d(TAG, "ACC Feature ready " + s);
-            }
-
-            @Override
-            public void ppgFeatureReady(String s) {
-                Log.d(TAG, "PPG Feature ready " + s);
-            }
-
-            @Override
-            public void ppiFeatureReady(String s) {
-                Log.d(TAG, "PPI Feature ready " + s);
-            }
-
-            @Override
-            public void biozFeatureReady(String s) {
-
             }
 
             @Override
@@ -118,68 +92,108 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             public void fwInformationReceived(String s, String s1) {
                 String msg = "Firmware: " + s1.trim();
                 Log.d(TAG, "Firmware: " + s + " " + s1.trim());
-                textViewFW.append(msg + "\n");
+                mTextViewFW.append(msg + "\n");
             }
 
             @Override
             public void batteryLevelReceived(String s, int i) {
                 String msg = "ID: " + s + "\nBattery level: " + i;
                 Log.d(TAG, "Battery level " + s + " " + i);
-//                Toast.makeText(classContext, msg, Toast.LENGTH_LONG).show();
-                textViewFW.append(msg + "\n");
+                mTextViewFW.append(msg + "\n");
             }
 
             @Override
             public void hrNotificationReceived(String s,
                                                PolarHrData polarHrData) {
                 Log.d(TAG, "HR " + polarHrData.hr);
-                textViewHR.setText(String.valueOf(polarHrData.hr));
-            }
-
-            @Override
-            public void polarFtpFeatureReady(String s) {
-                Log.d(TAG, "Polar FTP ready " + s);
+                mTextViewHR.setText(String.valueOf(polarHrData.hr));
             }
         });
-        api.connectToPolarDevice(DEVICE_ID);
+        mApi.connectToPolarDevice(DEVICE_ID);
+    }
 
-        DisplayMetrics displayMetrics = this.getResources().getDisplayMetrics();
-        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
-        float dpWidth = displayMetrics.widthPixels / displayMetrics.density;
-        Log.d(TAG, "dpWidth=" + dpWidth + " dpHeight=" + dpHeight);
-        Log.d(TAG, "widthPixels=" + displayMetrics.widthPixels +
-                " heightPixels=" + displayMetrics.heightPixels);
-        Log.d(TAG, "density=" + displayMetrics.density);
-        Log.d(TAG, "10dp=" + 10 / displayMetrics.density + " pixels");
-
-        plotter = new Plotter(this, POINTS_TO_PLOT, "ECG", Color.RED, false);
-        plotter.setListener(this);
-
-        plot.addSeries(plotter.getSeries(), plotter.getFormatter());
-        plot.setRangeBoundaries(-3.3 * POINTS_TO_PLOT / 500,
-                3.3 * POINTS_TO_PLOT / 500, BoundaryMode.FIXED);
-        plot.setRangeStep(StepMode.INCREMENT_BY_VAL, .5 * POINTS_TO_PLOT / 500);
-        plot.setDomainBoundaries(0, POINTS_TO_PLOT, BoundaryMode.FIXED);
-        plot.setDomainStep(StepMode.INCREMENT_BY_VAL,
-                26.05 * POINTS_TO_PLOT / 500);
-
-        Log.d(TAG, "plotWidth=" + plot.getWidth() +
-                " plotHeight=" + plot.getHeight());
+    @Override
+    public void onResume() {
+        super.onResume();
+        Log.d(TAG, "ECGActivity.onResume");
+        if (mPlotter == null) {
+            mPlot.post(new Runnable() {
+                @Override
+                public void run() {
+                    createPlot();
+                }
+            });
+        }
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        api.shutDown();
+        mApi.shutDown();
+    }
+
+    public void createPlot() {
+//        DisplayMetrics displayMetrics = this.getResources()
+//        .getDisplayMetrics();
+//        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
+//        float dpWidth = displayMetrics.widthPixels / displayMetrics.density;
+//        Log.d(TAG, "dpWidth=" + dpWidth + " dpHeight=" + dpHeight);
+//        Log.d(TAG, "widthPixels=" + displayMetrics.widthPixels +
+//                " heightPixels=" + displayMetrics.heightPixels);
+//        Log.d(TAG, "density=" + displayMetrics.density);
+//        Log.d(TAG, "10dp=" + 10 / displayMetrics.density + " pixels");
+//
+//        Log.d(TAG, "plotWidth=" + mPlot.getWidth() +
+//                " plotHeight=" + mPlot.getHeight());
+//
+//        RectF widgetRect = mPlot.getGraph().getWidgetDimensions().canvasRect;
+//        Log.d(TAG,
+//                "widgetRect LRTB=" + widgetRect.left + "," + widgetRect
+//                .right +
+//                        "," + widgetRect.top + "," + widgetRect.bottom);
+//        Log.d(TAG, "widgetRect width=" + (widgetRect.right - widgetRect
+//        .left) +
+//                " height=" + (widgetRect.bottom - widgetRect.top));
+//
+//        RectF gridRect = mPlot.getGraph().getGridRect();
+//        Log.d(TAG, "gridRect LRTB=" + gridRect.left + "," + gridRect.right +
+//                "," + gridRect.top + "," + gridRect.bottom);
+//        Log.d(TAG, "gridRect width=" + (gridRect.right - gridRect.left) +
+//                " height=" + (gridRect.bottom - gridRect.top));
+
+        // Calculate the range limits to make the blocks be square
+        // Using .5 mV and POINTS_TO_PLOT / 130 Hz for total grid size
+        // rMax is half the total, rMax at top and -rMax at bottom
+        RectF gridRect = mPlot.getGraph().getGridRect();
+        double rMax =
+                .25 * (gridRect.bottom - gridRect.top) * POINTS_TO_PLOT /
+                        26 / (gridRect.right - gridRect.left);
+        // Round it to one decimal point
+        rMax = Math.round(rMax * 10) / 10.;
+
+        mPlotter = new Plotter(this, POINTS_TO_PLOT, "ECG", Color.RED, false);
+        mPlotter.setListener(this);
+
+        mPlot.addSeries(mPlotter.getSeries(), mPlotter.getFormatter());
+        mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
+        mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .5);
+        mPlot.setLinesPerRangeLabel(5);
+        mPlot.setDomainBoundaries(0, POINTS_TO_PLOT, BoundaryMode.FIXED);
+        // Set the range block to be 26 (= .2 ms * 130 Hz)
+        mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
+                .2* 26);
+        mPlot.setLinesPerDomainLabel(5);
+
+//        mPlot.setRenderMode(Plot.RenderMode.USE_BACKGROUND_THREAD);
     }
 
     public void streamECG() {
-        if (ecgDisposable == null) {
-            ecgDisposable =
-                    api.requestEcgSettings(DEVICE_ID).toFlowable().flatMap(new Function<PolarSensorSetting, Publisher<PolarEcgData>>() {
+        if (mEcgDisposable == null) {
+            mEcgDisposable =
+                    mApi.requestEcgSettings(DEVICE_ID).toFlowable().flatMap(new Function<PolarSensorSetting, Publisher<PolarEcgData>>() {
                         @Override
                         public Publisher<PolarEcgData> apply(PolarSensorSetting sensorSetting) {
-//                            Log.d(TAG, "ecgDisposable requestEcgSettings " +
+//                            Log.d(TAG, "mEcgDisposable requestEcgSettings " +
 //                                    "apply");
 //                            Log.d(TAG,
 //                                    "sampleRate=" + sensorSetting
@@ -194,7 +208,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 //                                            .maxSettings().settings.
 //                                            get(PolarSensorSetting
 //                                            .SettingType.RANGE));
-                            return api.startEcgStreaming(DEVICE_ID,
+                            return mApi.startEcgStreaming(DEVICE_ID,
                                     sensorSetting.maxSettings());
                         }
                     }).observeOn(AndroidSchedulers.mainThread()).subscribe(
@@ -216,7 +230,14 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 //                                                    " samplesPerSec=" +
 //                                                    String.format("%.3f",
 //                                                    samplesPerSec));
-                                    plotter.addValues(plot, polarEcgData);
+
+                                    long now = new Date().getTime();
+                                    long ts =
+                                            polarEcgData.timeStamp / 1000000;
+                                    Log.d(TAG, "timeOffset=" + (now - ts) +
+                                            " " + new Date(now - ts));
+
+                                    mPlotter.addValues(mPlot, polarEcgData);
                                 }
                             },
                             new Consumer<Throwable>() {
@@ -224,7 +245,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                                 public void accept(Throwable throwable) {
                                     Log.e(TAG,
                                             "" + throwable.getLocalizedMessage());
-                                    ecgDisposable = null;
+                                    mEcgDisposable = null;
                                 }
                             },
                             new Action() {
@@ -236,19 +257,19 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                     );
         } else {
             // NOTE stops streaming if it is "running"
-            ecgDisposable.dispose();
-            ecgDisposable = null;
+            mEcgDisposable.dispose();
+            mEcgDisposable = null;
         }
     }
 
     @Override
     public void update() {
-//        Log.d(TAG, "plotWidth=" + plot.getWidth() +
-//                " plotHeight=" + plot.getHeight());
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                plot.redraw();
+//                Log.d(TAG, "update (UI) thread: " + Thread.currentThread()
+//                .getName());
+                mPlot.redraw();
             }
         });
     }
