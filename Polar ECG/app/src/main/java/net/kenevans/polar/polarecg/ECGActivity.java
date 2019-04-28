@@ -9,8 +9,13 @@ import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.androidplot.ui.Anchor;
+import com.androidplot.ui.HorizontalPositioning;
+import com.androidplot.ui.VerticalPositioning;
+import com.androidplot.util.Redrawer;
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.StepMode;
+import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
 import com.polar.polarecg.R;
 
@@ -176,15 +181,27 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 
         mPlot.addSeries(mPlotter.getSeries(), mPlotter.getFormatter());
         mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
-        mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .5);
+        // Set the range block to be .1 so a large block will be .5
+        mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .1);
         mPlot.setLinesPerRangeLabel(5);
         mPlot.setDomainBoundaries(0, POINTS_TO_PLOT, BoundaryMode.FIXED);
-        // Set the range block to be 26 (= .2 ms * 130 Hz)
+        // Set the domain block to be .2 * 26 so large block will be 26 samples
         mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
-                .2* 26);
+                .2 * 26);
         mPlot.setLinesPerDomainLabel(5);
 
+        mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
+
+        // These don't work
+//        mPlot.getTitle().position(0, HorizontalPositioning.ABSOLUTE_FROM_RIGHT,
+//                0,    VerticalPositioning.ABSOLUTE_FROM_TOP, Anchor.RIGHT_TOP);
+//        mPlot.getTitle().setAnchor(Anchor.BOTTOM_MIDDLE);
+//        mPlot.getTitle().setMarginTop(200);
+//        mPlot.getTitle().setPaddingTop(200);
+
 //        mPlot.setRenderMode(Plot.RenderMode.USE_BACKGROUND_THREAD);
+
+        update();
     }
 
     public void streamECG() {

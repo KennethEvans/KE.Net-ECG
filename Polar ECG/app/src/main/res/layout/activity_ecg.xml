@@ -26,7 +26,9 @@
         app:lineLabelInsetLeft="15dp"
         app:lineLabels="left"
         app:renderMode="use_background_thread"
-        app:title=""
+        app:title="@string/plot_title"
+        app:titleTextColor="#000000"
+        app:titleTextSize="15dp"
         />
 
     <TextView
