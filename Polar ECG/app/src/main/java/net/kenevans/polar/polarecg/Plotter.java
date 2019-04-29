@@ -64,14 +64,15 @@ public class Plotter {
             if (series.size() >= dataSize) {
                 series.removeFirst();
             }
-            // Convert from  uhV to mV
+            // Convert from  μV to mV
             series.addLast(dataIndex++, .001 * val);
             updatePlot(plot);
-//            Log.d(TAG, "addValues thread: " + Thread.currentThread().getName());
-         }
+//            Log.d(TAG, "addValues thread: " + Thread.currentThread()
+//            .getName());
+        }
     }
 
-    private void updatePlot(XYPlot plot) {
+    public void updatePlot(XYPlot plot) {
         long plotMin, plotMax;
         if (dataIndex < dataSize) {
             plotMin = dataIndex - dataSize;
@@ -81,6 +82,15 @@ public class Plotter {
             plotMax = dataIndex;
         }
         plot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
+        listener.update();
+    }
+
+    /**
+     * Clear the plot and reset dataIndex;
+     */
+    public void clear() {
+        dataIndex = 0;
+        series.clear();
         listener.update();
     }
 

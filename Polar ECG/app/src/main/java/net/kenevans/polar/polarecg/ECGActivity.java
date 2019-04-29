@@ -1,18 +1,18 @@
 package net.kenevans.polar.polarecg;
 
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.RectF;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
+import android.support.v4.content.res.ResourcesCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.androidplot.ui.Anchor;
-import com.androidplot.ui.HorizontalPositioning;
-import com.androidplot.ui.VerticalPositioning;
-import com.androidplot.util.Redrawer;
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
@@ -36,17 +36,20 @@ import polar.com.sdk.api.model.PolarHrData;
 import polar.com.sdk.api.model.PolarSensorSetting;
 
 public class ECGActivity extends AppCompatActivity implements PlotterListener {
+    private String TAG = "Polar_ECGActivity";
     // The total number of points = 26 * total large blocks desired
     private static final int POINTS_TO_PLOT = 520;
     private XYPlot mPlot;
     private Plotter mPlotter;
 
     TextView mTextViewHR, mTextViewFW;
-    private String TAG = "Polar_ECGActivity";
-    public PolarBleApi mApi;
-    private Disposable mEcgDisposable = null;
+    private PolarBleApi mApi;
+    private Disposable mEcgDisposable;
+    private boolean mPlaying;
+    private Menu mMenu;
     private String DEVICE_ID;
 
+    // Used in Logging
     private long time0;
 
     @Override
@@ -110,34 +113,138 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             @Override
             public void hrNotificationReceived(String s,
                                                PolarHrData polarHrData) {
-                Log.d(TAG, "HR " + polarHrData.hr);
-                mTextViewHR.setText(String.valueOf(polarHrData.hr));
+                if (mPlaying) {
+                    Log.d(TAG,
+                            "HR " + polarHrData.hr + " mPlaying=" + mPlaying);
+                    mTextViewHR.setText(String.valueOf(polarHrData.hr));
+                }
             }
         });
         mApi.connectToPolarDevice(DEVICE_ID);
+        mPlaying = true;
+    }
+
+    @Override
+    protected void onPause() {
+        Log.v(TAG, this.getClass().getSimpleName() + " onPause");
+        super.onPause();
     }
 
     @Override
     public void onResume() {
+        Log.v(TAG, this.getClass().getSimpleName() + " onResume");
         super.onResume();
-        Log.d(TAG, "ECGActivity.onResume");
         if (mPlotter == null) {
             mPlot.post(new Runnable() {
                 @Override
                 public void run() {
-                    createPlot();
+                    mPlotter = new Plotter(ECGActivity.this, POINTS_TO_PLOT,
+                            "ECG", Color.RED, false);
+                    mPlotter.setListener(ECGActivity.this);
+                    setupPLot();
                 }
             });
         }
     }
 
     @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        this.mMenu = menu;
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        switch (id) {
+            case R.id.pause:
+                if (mPlaying) {
+                    // Turn if off
+                    mPlaying = false;
+                    mMenu.getItem(0).setIcon(ResourcesCompat.
+                            getDrawable(getResources(),
+                                    R.drawable.ic_play_arrow_white_36dp, null));
+                    mMenu.getItem(0).setTitle("Start");
+                } else {
+                    // Turn it on
+                    mPlaying = true;
+                    // Clear the plot
+                    mPlotter.clear();
+                    if (mEcgDisposable == null) {
+                        // Turns it on
+                        streamECG();
+                    }
+                    mMenu.getItem(0).setIcon(ResourcesCompat.
+                            getDrawable(getResources(),
+                                    R.drawable.ic_pause_white_36dp, null));
+                    mMenu.getItem(0).setTitle("Pause");
+                }
+                return true;
+            case R.id.stop:
+                mPlaying = false;
+                if (mEcgDisposable != null) {
+                    // Turns it off
+                    streamECG();
+                }
+                mMenu.getItem(0).setIcon(ResourcesCompat.
+                        getDrawable(getResources(),
+                                R.drawable.ic_play_arrow_white_36dp, null));
+                mMenu.getItem(0).setTitle("Start");
+                return true;
+        }
+        return false;
+    }
+
+    /**
+     * This is necessary to handle orientation changes and keep the plot. It
+     * needs<br><br>
+     * android:configChanges="orientation|keyboardHidden|screenSize"<br><br>
+     * in AndroidManifest for the Activity.  With this set onPause and
+     * onResume are not called, only this.  Otherwise orientation changes
+     * cause it to start over with onCreate.  <br><br>
+     * The screen orientation changes have not been made yet, so anything
+     * relying on them must be done later.
+     *
+     * @param newConfig The new configuration.
+     */
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+        if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            Log.v(TAG, this.getClass().getSimpleName() +
+                    " onConfigurationChanged: Landscape");
+        } else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT) {
+            Log.v(TAG, this.getClass().getSimpleName() +
+                    " onConfigurationChanged: Portrait");
+        }
+
+        // Cannot do this now as the screen changes have only been dispatched
+        mPlot.post(new Runnable() {
+            @Override
+            public void run() {
+                setupPLot();
+                mPlotter.updatePlot(mPlot);
+            }
+        });
+    }
+
+
+    @Override
     public void onDestroy() {
+        Log.v(TAG, this.getClass().getSimpleName() + " onDestroy");
         super.onDestroy();
         mApi.shutDown();
     }
 
-    public void createPlot() {
+
+    /**
+     * Sets the plot parameters, calculating the range boundaries to have the
+     * same grid as the domain.  Calls update when done.
+     */
+    public void setupPLot() {
 //        DisplayMetrics displayMetrics = this.getResources()
 //        .getDisplayMetrics();
 //        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
@@ -176,9 +283,6 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         // Round it to one decimal point
         rMax = Math.round(rMax * 10) / 10.;
 
-        mPlotter = new Plotter(this, POINTS_TO_PLOT, "ECG", Color.RED, false);
-        mPlotter.setListener(this);
-
         mPlot.addSeries(mPlotter.getSeries(), mPlotter.getFormatter());
         mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
         // Set the range block to be .1 so a large block will be .5
@@ -193,8 +297,10 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
 
         // These don't work
-//        mPlot.getTitle().position(0, HorizontalPositioning.ABSOLUTE_FROM_RIGHT,
-//                0,    VerticalPositioning.ABSOLUTE_FROM_TOP, Anchor.RIGHT_TOP);
+//        mPlot.getTitle().position(0, HorizontalPositioning
+//        .ABSOLUTE_FROM_RIGHT,
+//                0,    VerticalPositioning.ABSOLUTE_FROM_TOP, Anchor
+//                .RIGHT_TOP);
 //        mPlot.getTitle().setAnchor(Anchor.BOTTOM_MIDDLE);
 //        mPlot.getTitle().setMarginTop(200);
 //        mPlot.getTitle().setPaddingTop(200);
@@ -204,6 +310,9 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         update();
     }
 
+    /**
+     * Toggles streaming for ECG.
+     */
     public void streamECG() {
         if (mEcgDisposable == null) {
             mEcgDisposable =
@@ -253,8 +362,9 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                                             polarEcgData.timeStamp / 1000000;
                                     Log.d(TAG, "timeOffset=" + (now - ts) +
                                             " " + new Date(now - ts));
-
-                                    mPlotter.addValues(mPlot, polarEcgData);
+                                    if (mPlaying) {
+                                        mPlotter.addValues(mPlot, polarEcgData);
+                                    }
                                 }
                             },
                             new Consumer<Throwable>() {
@@ -268,7 +378,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                             new Action() {
                                 @Override
                                 public void run() {
-                                    Log.d(TAG, "complete");
+                                    Log.d(TAG, "ECG streaming complete");
                                 }
                             }
                     );

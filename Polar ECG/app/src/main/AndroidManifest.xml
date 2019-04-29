@@ -24,6 +24,7 @@
         </activity>
         <activity
             android:name="net.kenevans.polar.polarecg.ECGActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
             >
         </activity>
     </application>
