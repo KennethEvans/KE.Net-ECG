@@ -1,6 +1,5 @@
 package net.kenevans.polar.polarecg;
 
-import android.content.Context;
 import android.util.Log;
 
 import com.androidplot.xy.BoundaryMode;
@@ -17,19 +16,29 @@ public class Plotter {
     String title;
     private String TAG = "Polar_Plotter";
     private PlotterListener listener;
-    private Context context;
     private Number[] plotNumbers = new Number[500];
     private XYSeriesFormatter formatter;
     private SimpleXYSeries series;
+    /**
+     * The next index in the data
+     */
     private long dataIndex;
+    /**
+     * The number of points to show
+     */
     private int dataSize;
+    /**
+     * The total number of points to keep
+     */
+    private int totalDataSize;
 
 
-    public Plotter(Context context, int dataSize, String title,
+    public Plotter(int totalDataSize, int dataSize,
+                   String title,
                    Integer lineColor, boolean showVertices) {
-        this.context = context;
         this.title = title;
         this.dataSize = dataSize;
+        this.totalDataSize = totalDataSize;
         this.dataIndex = 0;
 
         formatter = new LineAndPointFormatter(lineColor,
@@ -61,7 +70,7 @@ public class Plotter {
 
         // Add the new values, removing old values if needed
         for (Integer val : polarEcgData.samples) {
-            if (series.size() >= dataSize) {
+            if (series.size() >= totalDataSize) {
                 series.removeFirst();
             }
             // Convert from  μV to mV

@@ -14,6 +14,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.androidplot.xy.BoundaryMode;
+import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
@@ -38,7 +39,8 @@ import polar.com.sdk.api.model.PolarSensorSetting;
 public class ECGActivity extends AppCompatActivity implements PlotterListener {
     private String TAG = "Polar_ECGActivity";
     // The total number of points = 26 * total large blocks desired
-    private static final int POINTS_TO_PLOT = 520;
+    private static final int N_TOTAL_POINTS = 3900;  // 150 = 30 sec
+    private static final int N_PLOT_POINTS = 520;    // 20
     private XYPlot mPlot;
     private Plotter mPlotter;
 
@@ -138,7 +140,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             mPlot.post(new Runnable() {
                 @Override
                 public void run() {
-                    mPlotter = new Plotter(ECGActivity.this, POINTS_TO_PLOT,
+                    mPlotter = new Plotter(N_TOTAL_POINTS, N_PLOT_POINTS,
                             "ECG", Color.RED, false);
                     mPlotter.setListener(ECGActivity.this);
                     setupPLot();
@@ -163,6 +165,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                 if (mPlaying) {
                     // Turn if off
                     mPlaying = false;
+                    allowPan(true);
                     mMenu.getItem(0).setIcon(ResourcesCompat.
                             getDrawable(getResources(),
                                     R.drawable.ic_play_arrow_white_36dp, null));
@@ -170,6 +173,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                 } else {
                     // Turn it on
                     mPlaying = true;
+                    allowPan(false);
                     // Clear the plot
                     mPlotter.clear();
                     if (mEcgDisposable == null) {
@@ -274,11 +278,11 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 //                " height=" + (gridRect.bottom - gridRect.top));
 
         // Calculate the range limits to make the blocks be square
-        // Using .5 mV and POINTS_TO_PLOT / 130 Hz for total grid size
+        // Using .5 mV and N_PLOT_POINTS / 130 Hz for total grid size
         // rMax is half the total, rMax at top and -rMax at bottom
         RectF gridRect = mPlot.getGraph().getGridRect();
         double rMax =
-                .25 * (gridRect.bottom - gridRect.top) * POINTS_TO_PLOT /
+                .25 * (gridRect.bottom - gridRect.top) * N_PLOT_POINTS /
                         26 / (gridRect.right - gridRect.left);
         // Round it to one decimal point
         rMax = Math.round(rMax * 10) / 10.;
@@ -288,7 +292,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         // Set the range block to be .1 so a large block will be .5
         mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .1);
         mPlot.setLinesPerRangeLabel(5);
-        mPlot.setDomainBoundaries(0, POINTS_TO_PLOT, BoundaryMode.FIXED);
+        mPlot.setDomainBoundaries(0, N_PLOT_POINTS, BoundaryMode.FIXED);
         // Set the domain block to be .2 * 26 so large block will be 26 samples
         mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
                 .2 * 26);
@@ -310,15 +314,26 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         update();
     }
 
+    private void allowPan(boolean allow) {
+        if (allow) {
+            PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
+        } else {
+            PanZoom.attach(mPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
+        }
+    }
+
     /**
      * Toggles streaming for ECG.
      */
     public void streamECG() {
         if (mEcgDisposable == null) {
             mEcgDisposable =
-                    mApi.requestEcgSettings(DEVICE_ID).toFlowable().flatMap(new Function<PolarSensorSetting, Publisher<PolarEcgData>>() {
-                        @Override
-                        public Publisher<PolarEcgData> apply(PolarSensorSetting sensorSetting) {
+                    mApi.requestEcgSettings(DEVICE_ID).
+                            toFlowable().
+                            flatMap(new Function<PolarSensorSetting,
+                                    Publisher<PolarEcgData>>() {
+                                @Override
+                                public Publisher<PolarEcgData> apply(PolarSensorSetting sensorSetting) {
 //                            Log.d(TAG, "mEcgDisposable requestEcgSettings " +
 //                                    "apply");
 //                            Log.d(TAG,
@@ -334,10 +349,10 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 //                                            .maxSettings().settings.
 //                                            get(PolarSensorSetting
 //                                            .SettingType.RANGE));
-                            return mApi.startEcgStreaming(DEVICE_ID,
-                                    sensorSetting.maxSettings());
-                        }
-                    }).observeOn(AndroidSchedulers.mainThread()).subscribe(
+                                    return mApi.startEcgStreaming(DEVICE_ID,
+                                            sensorSetting.maxSettings());
+                                }
+                            }).observeOn(AndroidSchedulers.mainThread()).subscribe(
                             new Consumer<PolarEcgData>() {
                                 @Override
                                 public void accept(PolarEcgData polarEcgData) {
