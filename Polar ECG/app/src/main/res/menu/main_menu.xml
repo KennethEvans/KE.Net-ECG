@@ -12,4 +12,9 @@
         android:icon="@drawable/ic_stop_white_36dp"
         app:showAsAction="always"
         />
+    <item
+        android:id="@+id/save"
+        android:title="@string/save_item"
+        app:showAsAction="never"
+        />
 </menu>

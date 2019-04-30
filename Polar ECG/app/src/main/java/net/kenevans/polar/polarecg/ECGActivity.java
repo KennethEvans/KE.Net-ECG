@@ -1,18 +1,31 @@
 package net.kenevans.polar.polarecg;
 
+import android.Manifest;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.RectF;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.preference.PreferenceManager;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.content.res.ResourcesCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.androidplot.Plot;
+import com.androidplot.PlotListener;
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.StepMode;
@@ -22,7 +35,13 @@ import com.polar.polarecg.R;
 
 import org.reactivestreams.Publisher;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.Locale;
 
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
@@ -43,7 +62,18 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
     private static final int N_PLOT_POINTS = 520;    // 20
     private XYPlot mPlot;
     private Plotter mPlotter;
+    private boolean mOrientationChanged = false;
 
+    private static final String PREF_ALLOW_WRITE_EXTERNAL_STORAGE =
+            "allowWriteExternalStorage";
+
+    private boolean mPromptForWriteExternalStorage = true;
+    private boolean mAllowWrite = false;
+
+    /**
+     * Request code for WRITE_EXTERNAL_STORAGE.
+     */
+    private static final int ACCESS_WRITE_EXTERNAL_STORAGE_REQ = 2;
     TextView mTextViewHR, mTextViewFW;
     private PolarBleApi mApi;
     private Disposable mEcgDisposable;
@@ -52,7 +82,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
     private String DEVICE_ID;
 
     // Used in Logging
-    private long time0;
+    private long ecgTime0;
+    private long redrawTime0;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -63,7 +94,27 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         mTextViewFW = findViewById(R.id.fw);
 
         mPlot = findViewById(R.id.plot);
+        mPlot.addListener(new PlotListener() {
+            @Override
+            public void onBeforeDraw(Plot source, Canvas canvas) {
+            }
 
+            @Override
+            public void onAfterDraw(Plot source, Canvas canvas) {
+//                long now = new Date().getTime();
+//                Log.d(TAG,
+//                        "onAfterDraw: mOrientationChanged=" +
+//                        mOrientationChanged +
+//                                " deltaT=" + (now - redrawTime0));
+//                redrawTime0 = now;
+                if (mOrientationChanged) {
+                    mOrientationChanged = false;
+                    Log.d(TAG, "onAfterDraw: orientation changed");
+                    setupPLot();
+                    mPlotter.updatePlot(mPlot);
+                }
+            }
+        });
         mApi = PolarBleApiDefaultImpl.defaultImplementation(this,
                 PolarBleApi.FEATURE_POLAR_SENSOR_STREAMING |
                         PolarBleApi.FEATURE_BATTERY_INFO |
@@ -136,6 +187,23 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
     public void onResume() {
         Log.v(TAG, this.getClass().getSimpleName() + " onResume");
         super.onResume();
+        // Handle prompting for permissions
+        SharedPreferences prefs = PreferenceManager
+                .getDefaultSharedPreferences(this);
+        mAllowWrite = prefs.getBoolean(PREF_ALLOW_WRITE_EXTERNAL_STORAGE,
+                false);
+        Log.d(TAG, "mAllowWrite=" + mAllowWrite);
+        if (Build.VERSION.SDK_INT >= 23
+                && ContextCompat.checkSelfPermission(this, Manifest
+                .permission.WRITE_EXTERNAL_STORAGE) != PackageManager
+                .PERMISSION_GRANTED) {
+            if (mPromptForWriteExternalStorage) {
+                requestWriteExternalStoragePermission();
+            }
+        }
+        invalidateOptionsMenu();
+
+        // Setup the plot if not done
         if (mPlotter == null) {
             mPlot.post(new Runnable() {
                 @Override
@@ -151,9 +219,24 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        this.mMenu = menu;
+        Log.v(TAG, this.getClass().getSimpleName() + " onCreateOptionsMenu");
+        Log.d(TAG, "mAllowWrite=" + mAllowWrite + " mPlaying=" + mPlaying);
+        mMenu = menu;
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main_menu, menu);
+        if (mPlaying) {
+            mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
+                    getDrawable(getResources(),
+                            R.drawable.ic_pause_white_36dp, null));
+            mMenu.findItem(R.id.pause).setTitle("Pause");
+            mMenu.findItem(R.id.save).setVisible(false);
+        } else {
+            mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
+                    getDrawable(getResources(),
+                            R.drawable.ic_play_arrow_white_36dp, null));
+            mMenu.findItem(R.id.pause).setTitle("Start");
+            mMenu.findItem(R.id.save).setVisible(mAllowWrite && true);
+        }
         return true;
     }
 
@@ -166,10 +249,11 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                     // Turn if off
                     mPlaying = false;
                     allowPan(true);
-                    mMenu.getItem(0).setIcon(ResourcesCompat.
+                    mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
                             getDrawable(getResources(),
                                     R.drawable.ic_play_arrow_white_36dp, null));
-                    mMenu.getItem(0).setTitle("Start");
+                    mMenu.findItem(R.id.pause).setTitle("Start");
+                    mMenu.findItem(R.id.save).setVisible(mAllowWrite && true);
                 } else {
                     // Turn it on
                     mPlaying = true;
@@ -180,10 +264,11 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                         // Turns it on
                         streamECG();
                     }
-                    mMenu.getItem(0).setIcon(ResourcesCompat.
+                    mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
                             getDrawable(getResources(),
                                     R.drawable.ic_pause_white_36dp, null));
-                    mMenu.getItem(0).setTitle("Pause");
+                    mMenu.findItem(R.id.pause).setTitle("Pause");
+                    mMenu.findItem(R.id.save).setVisible(false);
                 }
                 return true;
             case R.id.stop:
@@ -192,10 +277,14 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                     // Turns it off
                     streamECG();
                 }
-                mMenu.getItem(0).setIcon(ResourcesCompat.
+                mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
                         getDrawable(getResources(),
                                 R.drawable.ic_play_arrow_white_36dp, null));
-                mMenu.getItem(0).setTitle("Start");
+                mMenu.findItem(R.id.pause).setTitle("Start");
+                mMenu.findItem(R.id.save).setVisible(mAllowWrite && true);
+                return true;
+            case R.id.save:
+                save();
                 return true;
         }
         return false;
@@ -226,11 +315,11 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         }
 
         // Cannot do this now as the screen changes have only been dispatched
+        mOrientationChanged = true;
         mPlot.post(new Runnable() {
             @Override
             public void run() {
-                setupPLot();
-                mPlotter.updatePlot(mPlot);
+                mPlot.redraw();
             }
         });
     }
@@ -243,6 +332,53 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         mApi.shutDown();
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[]
+            permissions, @NonNull int[] grantResults) {
+        Log.d(TAG, this.getClass().getSimpleName() + ": " +
+                "onRequestPermissionsResult:" + " permissions=" +
+                permissions[0]
+                + "\ngrantResults=" + grantResults[0]
+                + "\nmPromptForReadExternalStorage="
+                + mPromptForWriteExternalStorage);
+        switch (requestCode) {
+            case ACCESS_WRITE_EXTERNAL_STORAGE_REQ:
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, "WRITE_EXTERNAL_STORAGE granted");
+                    mAllowWrite = true;
+                    // Save this as onResume will be called next, not onPause
+                    SharedPreferences.Editor editor = PreferenceManager
+                            .getDefaultSharedPreferences(this)
+                            .edit();
+                    editor.putBoolean(PREF_ALLOW_WRITE_EXTERNAL_STORAGE,
+                            mAllowWrite);
+                    editor.apply();
+                } else if (grantResults[0] == PackageManager.PERMISSION_DENIED) {
+                    Log.d(TAG, "WRITE_EXTERNAL_STORAGE denied");
+                    mPromptForWriteExternalStorage = false;
+                    mAllowWrite = false;
+                    // Save this as onResume will be called next, not onPause
+                    SharedPreferences.Editor editor = PreferenceManager
+                            .getDefaultSharedPreferences(this)
+                            .edit();
+                    editor.putBoolean(PREF_ALLOW_WRITE_EXTERNAL_STORAGE,
+                            mAllowWrite);
+                    editor.apply();
+                }
+                break;
+        }
+    }
+
+    /**
+     * Request permission for WRITE_EXTERNAL_STORAGE.
+     */
+    private void requestWriteExternalStoragePermission() {
+        // This is not available before API 16
+        if (Build.VERSION.SDK_INT < 16) return;
+        ActivityCompat.requestPermissions(this, new String[]{Manifest
+                        .permission.WRITE_EXTERNAL_STORAGE},
+                ACCESS_WRITE_EXTERNAL_STORAGE_REQ);
+    }
 
     /**
      * Sets the plot parameters, calculating the range boundaries to have the
@@ -286,10 +422,19 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                         26 / (gridRect.right - gridRect.left);
         // Round it to one decimal point
         rMax = Math.round(rMax * 10) / 10.;
+        Log.d(TAG, "setupPLot: rMax = " + rMax + " ");
+        Log.d(TAG, "  gridRect LRTB=" + gridRect.left + "," + gridRect.right +
+                "," + gridRect.top + "," + gridRect.bottom);
+        Log.d(TAG, "  gridRect width=" + (gridRect.right - gridRect.left) +
+                " height=" + (gridRect.bottom - gridRect.top));
+        DisplayMetrics displayMetrics = this.getResources()
+                .getDisplayMetrics();
+        Log.d(TAG, "  display widthPixels=" + displayMetrics.widthPixels +
+                " heightPixels=" + displayMetrics.heightPixels);
 
         mPlot.addSeries(mPlotter.getSeries(), mPlotter.getFormatter());
         mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
-        // Set the range block to be .1 so a large block will be .5
+        // Set the range block to be .1 mV so a large block will be .5 mV
         mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .1);
         mPlot.setLinesPerRangeLabel(5);
         mPlot.setDomainBoundaries(0, N_PLOT_POINTS, BoundaryMode.FIXED);
@@ -319,6 +464,51 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
         } else {
             PanZoom.attach(mPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
+        }
+    }
+
+    private void save() {
+        String msg;
+        String state = Environment.getExternalStorageState();
+        if (!Environment.MEDIA_MOUNTED.equals(state)) {
+            msg = "External Storage is not available";
+            Log.e(TAG, msg);
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+            return;
+        }
+        File dir = Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS);
+        String format = "yyyy-MM-dd_HH-mm";
+        SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
+        Date now = new Date();
+        String fileName = "PolarECG-" + df.format(now) + ".txt";
+        File file = new File(dir, fileName);
+        PrintWriter out = null;
+        try {
+            out = new PrintWriter(new FileWriter(file));
+            LinkedList<Number> vals = mPlotter.getSeries().getyVals();
+            out.write(now.toString() + "\n");
+            out.write(vals.size() + " values\n");
+            for (Number val : vals) {
+                out.write(String.format(Locale.US, "%.3f\n", val.doubleValue()));
+            }
+            out.flush();
+            msg = "Wrote " + file.getPath();
+            Log.d(TAG, msg);
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+        } catch (Exception ex) {
+            msg = "Error writing " + file.getPath();
+            Log.e(TAG, msg);
+            Log.e(TAG, Log.getStackTraceString(ex));
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+        } finally {
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (Exception ex) {
+                    // Do nothing
+                }
+            }
         }
     }
 
@@ -358,8 +548,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                                 public void accept(PolarEcgData polarEcgData) {
 //                                    double deltaT =
 //                                            .000000001 * (polarEcgData
-//                                            .timeStamp - time0);
-//                                    time0 = polarEcgData.timeStamp;
+//                                            .timeStamp - ecgTime0);
+//                                    ecgTime0 = polarEcgData.timeStamp;
 //                                    int nSamples = polarEcgData.samples
 //                                    .size();
 //                                    double samplesPerSec = nSamples / deltaT;
@@ -372,13 +562,14 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 //                                                    String.format("%.3f",
 //                                                    samplesPerSec));
 
-                                    long now = new Date().getTime();
-                                    long ts =
-                                            polarEcgData.timeStamp / 1000000;
-                                    Log.d(TAG, "timeOffset=" + (now - ts) +
-                                            " " + new Date(now - ts));
+//                                    long now = new Date().getTime();
+//                                    long ts =
+//                                            polarEcgData.timeStamp / 1000000;
+//                                    Log.d(TAG, "timeOffset=" + (now - ts) +
+//                                            " " + new Date(now - ts));
                                     if (mPlaying) {
-                                        mPlotter.addValues(mPlot, polarEcgData);
+                                        mPlotter.addValues(mPlot,
+                                                polarEcgData);
                                     }
                                 }
                             },

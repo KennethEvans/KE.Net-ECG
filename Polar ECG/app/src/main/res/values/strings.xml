@@ -13,4 +13,5 @@
     <string name="pause_item">Pause</string>
     <string name="play_item">Play</string>
     <string name="stop_item">Stop</string>
+    <string name="save_item">Save</string>
 </resources>
