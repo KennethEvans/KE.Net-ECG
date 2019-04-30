@@ -3,6 +3,7 @@
     <string name="plot_title">25 mm/s, 10 mm/mV</string>
     <string name="plot_range_title">mV</string>
     <string name="plot_domain_title">msec</string>
+    <string name="note_dialog_title">Enter a Note</string>
     <string name="disconnect">DISCONNECT</string>
     <string name="connect">CONNECT ECG</string>
     <string name="connect2">CONNECT HR/RR</string>

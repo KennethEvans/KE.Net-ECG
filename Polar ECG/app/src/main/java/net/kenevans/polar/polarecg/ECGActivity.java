@@ -1,6 +1,8 @@
 package net.kenevans.polar.polarecg;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -16,11 +18,15 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.res.ResourcesCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -467,6 +473,11 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         }
     }
 
+    /**
+     * Save the current samples as a file.  Prompts for a note, then calls
+     * finishSave.
+     */
+    @SuppressLint("InflateParams")
     private void save() {
         String msg;
         String state = Environment.getExternalStorageState();
@@ -476,6 +487,40 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
             return;
         }
+        // Get a note
+        LayoutInflater layoutInflaterAndroid = LayoutInflater.from(this);
+        View mView = layoutInflaterAndroid.inflate(R.layout.input_dialog_box,
+                null);
+        AlertDialog.Builder alertDialogBuilderUserInput =
+                new AlertDialog.Builder(this, R.style.AlertDialogTheme);
+        alertDialogBuilderUserInput.setView(mView);
+
+        final EditText userInputDialogEditText =
+                mView.findViewById(R.id.inputDialogText);
+        alertDialogBuilderUserInput
+                .setCancelable(false)
+                .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialogBox, int id) {
+                        finishSave(userInputDialogEditText.getText().toString());
+                    }
+                })
+                .setNegativeButton("Cancel",
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialogBox,
+                                                int id) {
+                            }
+                        });
+        AlertDialog alertDialogAndroid = alertDialogBuilderUserInput.create();
+        alertDialogAndroid.show();
+    }
+
+    /**
+     * Finishes the save after getting the note.
+     *
+     * @param note The note.
+     */
+    private void finishSave(String note) {
+        String msg;
         File dir = Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_DOWNLOADS);
         String format = "yyyy-MM-dd_HH-mm";
@@ -488,9 +533,14 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             out = new PrintWriter(new FileWriter(file));
             LinkedList<Number> vals = mPlotter.getSeries().getyVals();
             out.write(now.toString() + "\n");
-            out.write(vals.size() + " values\n");
+            int nSamples = vals.size();
+            out.write(note + "\n");
+            out.write("HR " + mTextViewHR.getText().toString() + "\n");
+            out.write(nSamples + " values " + String.format(Locale.US, "%.1f " +
+                    "sec\n", nSamples / 130.));
             for (Number val : vals) {
-                out.write(String.format(Locale.US, "%.3f\n", val.doubleValue()));
+                out.write(String.format(Locale.US, "%.3f\n",
+                        val.doubleValue()));
             }
             out.flush();
             msg = "Wrote " + file.getPath();
