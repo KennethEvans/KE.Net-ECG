@@ -9,8 +9,8 @@
     <application
         android:allowBackup="true"
         android:label="@string/app_name"
-        android:icon="@mipmap/polar_compare"
-        android:roundIcon="@mipmap/polar_compare"
+        android:icon="@mipmap/ic_polar_compare"
+        android:roundIcon="@mipmap/ic_polar_compare_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
