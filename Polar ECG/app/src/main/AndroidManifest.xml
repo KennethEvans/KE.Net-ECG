@@ -10,8 +10,8 @@
     <application
         android:allowBackup="true"
         android:label="@string/app_name"
-        android:icon="@mipmap/polar_ecg"
-        android:roundIcon="@mipmap/polar_ecg"
+        android:icon="@mipmap/ic_polar_ecg"
+        android:roundIcon="@mipmap/ic_polar_ecg_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
