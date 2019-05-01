@@ -1,7 +1,6 @@
 package net.kenevans.polar.polarecg;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -20,12 +19,14 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.content.res.ResourcesCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.text.InputType;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -290,7 +291,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                 mMenu.findItem(R.id.save).setVisible(mAllowWrite && true);
                 return true;
             case R.id.save:
-                save();
+                save(null);
                 return true;
         }
         return false;
@@ -477,8 +478,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
      * Save the current samples as a file.  Prompts for a note, then calls
      * finishSave.
      */
-    @SuppressLint("InflateParams")
-    private void save() {
+    private void save(View view) {
         String msg;
         String state = Environment.getExternalStorageState();
         if (!Environment.MEDIA_MOUNTED.equals(state)) {
@@ -486,32 +486,34 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             Log.e(TAG, msg);
             Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
             return;
-        }
-        // Get a note
-        LayoutInflater layoutInflaterAndroid = LayoutInflater.from(this);
-        View mView = layoutInflaterAndroid.inflate(R.layout.input_dialog_box,
-                null);
-        AlertDialog.Builder alertDialogBuilderUserInput =
-                new AlertDialog.Builder(this, R.style.AlertDialogTheme);
-        alertDialogBuilderUserInput.setView(mView);
+        }// Get a note
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this,
+                R.style.PolarTheme);
+        dialog.setTitle(R.string.note_dialog_title);
 
-        final EditText userInputDialogEditText =
-                mView.findViewById(R.id.inputDialogText);
-        alertDialogBuilderUserInput
-                .setCancelable(false)
-                .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialogBox, int id) {
-                        finishSave(userInputDialogEditText.getText().toString());
+        View viewInflated = LayoutInflater.from(getApplicationContext()).
+                inflate(R.layout.device_id_dialog_layout,
+                        view == null ? null : (ViewGroup) view.getRootView(),
+                        false);
+
+        final EditText input = viewInflated.findViewById(R.id.input);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        dialog.setView(viewInflated);
+
+        dialog.setPositiveButton(R.string.ok,
+                new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        finishSave(input.getText().toString());
                     }
-                })
-                .setNegativeButton("Cancel",
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialogBox,
-                                                int id) {
-                            }
-                        });
-        AlertDialog alertDialogAndroid = alertDialogBuilderUserInput.create();
-        alertDialogAndroid.show();
+                });
+        dialog.setNegativeButton(R.string.cancel,
+                new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                });
+        dialog.show();
     }
 
     /**
@@ -530,12 +532,16 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         File file = new File(dir, fileName);
         PrintWriter out = null;
         try {
+            // Write header
             out = new PrintWriter(new FileWriter(file));
-            LinkedList<Number> vals = mPlotter.getSeries().getyVals();
             out.write(now.toString() + "\n");
-            int nSamples = vals.size();
+            // The text for this TextView already has a \n
+            out.write(mTextViewFW.getText().toString());
             out.write(note + "\n");
             out.write("HR " + mTextViewHR.getText().toString() + "\n");
+            // Write samples
+            LinkedList<Number> vals = mPlotter.getSeries().getyVals();
+            int nSamples = vals.size();
             out.write(nSamples + " values " + String.format(Locale.US, "%.1f " +
                     "sec\n", nSamples / 130.));
             for (Number val : vals) {

@@ -4,6 +4,7 @@
     <string name="plot_range_title">mV</string>
     <string name="plot_domain_title">msec</string>
     <string name="note_dialog_title">Enter a Note</string>
+    <string name="device_id_dialog_title">Enter your Polar device\'s ID</string>
     <string name="disconnect">DISCONNECT</string>
     <string name="connect">CONNECT ECG</string>
     <string name="connect2">CONNECT HR/RR</string>
@@ -15,4 +16,6 @@
     <string name="play_item">Play</string>
     <string name="stop_item">Stop</string>
     <string name="save_item">Save</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
 </resources>

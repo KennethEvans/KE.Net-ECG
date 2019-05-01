@@ -56,9 +56,10 @@ public class MainActivity extends AppCompatActivity {
 
     public void showDialog(View view){
         AlertDialog.Builder dialog = new AlertDialog.Builder(this, R.style.PolarTheme);
-        dialog.setTitle("Enter your Polar device's ID");
+        dialog.setTitle(R.string.device_id_dialog_title);
 
-        View viewInflated = LayoutInflater.from(getApplicationContext()).inflate(R.layout.device_id_dialog_layout,(ViewGroup) view.getRootView() , false);
+        View viewInflated = LayoutInflater.from(getApplicationContext()).
+                inflate(R.layout.device_id_dialog_layout,(ViewGroup) view.getRootView() , false);
 
         final EditText input = viewInflated.findViewById(R.id.input);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
@@ -66,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
         input.setText(DEVICE_ID);
         dialog.setView(viewInflated);
 
-        dialog.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+        dialog.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 DEVICE_ID = input.getText().toString();
@@ -75,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
                 editor.apply();
             }
         });
-        dialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+        dialog.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 dialog.cancel();
