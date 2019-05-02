@@ -106,4 +106,8 @@ public class Plotter {
     public void setListener(PlotterListener listener) {
         this.listener = listener;
     }
+
+    public long getDataIndex() {
+        return dataIndex;
+    }
 }

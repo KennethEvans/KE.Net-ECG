@@ -81,7 +81,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
      * Request code for WRITE_EXTERNAL_STORAGE.
      */
     private static final int ACCESS_WRITE_EXTERNAL_STORAGE_REQ = 2;
-    TextView mTextViewHR, mTextViewFW;
+    TextView mTextViewHR, mTextViewFW, mTextViewTime;
     private PolarBleApi mApi;
     private Disposable mEcgDisposable;
     private boolean mPlaying;
@@ -99,6 +99,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         DEVICE_ID = getIntent().getStringExtra("id");
         mTextViewHR = findViewById(R.id.info);
         mTextViewFW = findViewById(R.id.fw);
+        mTextViewTime = findViewById(R.id.time);
 
         mPlot = findViewById(R.id.plot);
         mPlot.addListener(new PlotListener() {
@@ -265,6 +266,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                     // Turn it on
                     mPlaying = true;
                     allowPan(false);
+                    mTextViewTime.setText(getString(R.string.elapsed_time, 0.0));
                     // Clear the plot
                     mPlotter.clear();
                     if (mEcgDisposable == null) {
@@ -280,6 +282,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                 return true;
             case R.id.stop:
                 mPlaying = false;
+                allowPan(true);
                 if (mEcgDisposable != null) {
                     // Turns it off
                     streamECG();
@@ -624,8 +627,10 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 //                                    Log.d(TAG, "timeOffset=" + (now - ts) +
 //                                            " " + new Date(now - ts));
                                     if (mPlaying) {
-                                        mPlotter.addValues(mPlot,
-                                                polarEcgData);
+                                        mPlotter.addValues(mPlot, polarEcgData);
+                                        double elapsed =
+                                                mPlotter.getDataIndex() / 130.;
+                                        mTextViewTime.setText(getString(R.string.elapsed_time, elapsed));
                                     }
                                 }
                             },

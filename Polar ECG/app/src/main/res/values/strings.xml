@@ -12,6 +12,7 @@
     <string name="connected">Connected!</string>
     <string name="device_id">device_id</string>
     <string name="set_id_button">Change device ID</string>
+    <string name="elapsed_time">%1$.1f sec"</string>
     <string name="pause_item">Pause</string>
     <string name="play_item">Play</string>
     <string name="stop_item">Stop</string>
