@@ -266,7 +266,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                     // Turn it on
                     mPlaying = true;
                     allowPan(false);
-                    mTextViewTime.setText(getString(R.string.elapsed_time, 0.0));
+                    mTextViewTime.setText(getString(R.string.elapsed_time,
+                            0.0));
                     // Clear the plot
                     mPlotter.clear();
                     if (mEcgDisposable == null) {
@@ -531,7 +532,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         String format = "yyyy-MM-dd_HH-mm";
         SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
         Date now = new Date();
-        String fileName = "PolarECG-" + df.format(now) + ".txt";
+        String fileName = "PolarECG-" + df.format(now) + ".csv";
         File file = new File(dir, fileName);
         PrintWriter out = null;
         try {
