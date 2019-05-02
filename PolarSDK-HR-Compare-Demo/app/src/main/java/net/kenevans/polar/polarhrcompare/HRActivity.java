@@ -1,4 +1,4 @@
-package com.polar.polarsdkhrcomparedemo;
+package net.kenevans.polar.polarhrcompare;
 
 import android.content.Context;
 import android.graphics.Color;
@@ -121,7 +121,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                         api1.startOhrPPIStreaming(DEVICE_ID_1).observeOn(AndroidSchedulers.mainThread()).subscribe(
                                 new Consumer<PolarOhrPPIData>() {
                                     @Override
-                                    public void accept(PolarOhrPPIData ppiData) throws Exception {
+                                    public void accept(PolarOhrPPIData ppiData) {
                                         plotter1.addValues(plot, ppiData);
                                         for (PolarOhrPPIData.PolarOhrPPISample sample : ppiData.samples) {
                                             Log.d(TAG,
@@ -136,14 +136,14 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                                 },
                                 new Consumer<Throwable>() {
                                     @Override
-                                    public void accept(Throwable throwable) throws Exception {
+                                    public void accept(Throwable throwable)  {
                                         Log.e(TAG,
                                                 "PPI failed for device 1: " + throwable.getLocalizedMessage());
                                     }
                                 },
                                 new Action() {
                                     @Override
-                                    public void run() throws Exception {
+                                    public void run()  {
                                         Log.d(TAG, "PPI complete for device 1");
                                     }
                                 }
@@ -268,7 +268,7 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                         api2.startOhrPPIStreaming(DEVICE_ID_2).observeOn(AndroidSchedulers.mainThread()).subscribe(
                                 new Consumer<PolarOhrPPIData>() {
                                     @Override
-                                    public void accept(PolarOhrPPIData ppiData) throws Exception {
+                                    public void accept(PolarOhrPPIData ppiData)  {
                                         plotter2.addValues(plot, ppiData);
                                         for (PolarOhrPPIData.PolarOhrPPISample sample : ppiData.samples) {
                                             Log.d(TAG,
@@ -283,14 +283,14 @@ public class HRActivity extends AppCompatActivity implements PlotterListener {
                                 },
                                 new Consumer<Throwable>() {
                                     @Override
-                                    public void accept(Throwable throwable) throws Exception {
+                                    public void accept(Throwable throwable)  {
                                         Log.e(TAG,
                                                 "PPI failed for device 2: " + throwable.getLocalizedMessage());
                                     }
                                 },
                                 new Action() {
                                     @Override
-                                    public void run() throws Exception {
+                                    public void run()  {
                                         Log.d(TAG, "PPI complete for device 2");
                                     }
                                 }

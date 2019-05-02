@@ -1,4 +1,4 @@
-package com.polar.polarsdkhrcomparedemo;
+package net.kenevans.polar.polarhrcompare;
 
 import android.content.Context;
 import android.util.Log;

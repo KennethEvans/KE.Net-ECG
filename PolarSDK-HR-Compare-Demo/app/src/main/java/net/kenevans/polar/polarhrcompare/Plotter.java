@@ -1,4 +1,4 @@
-package com.polar.polarsdkhrcomparedemo;
+package net.kenevans.polar.polarhrcompare;
 
 import android.content.Context;
 import android.graphics.Paint;
@@ -6,8 +6,10 @@ import android.graphics.Paint;
 import com.androidplot.xy.AdvancedLineAndPointRenderer;
 import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.XYSeries;
+
 import java.util.Arrays;
 
+@SuppressWarnings("WeakerAccess")
 public class Plotter {
 
     String title;
@@ -20,43 +22,45 @@ public class Plotter {
     private int dataIndex;
 
 
-    public Plotter(Context context, String title){
+    public Plotter(Context context, String title) {
         this.context = context;
         this.title = title;
 
-        for(int i = 0; i < plotNumbers.length - 1; i++){
+        for (int i = 0; i < plotNumbers.length - 1; i++) {
             plotNumbers[i] = 60;
         }
 
         formatter = new FadeFormatter(800);
         formatter.setLegendIconEnabled(false);
 
-        series = new SimpleXYSeries(Arrays.asList(plotNumbers), SimpleXYSeries.ArrayFormat.Y_VALS_ONLY, title);
+        series = new SimpleXYSeries(Arrays.asList(plotNumbers),
+                SimpleXYSeries.ArrayFormat.Y_VALS_ONLY, title);
     }
 
-    public SimpleXYSeries getSeries(){
+    public SimpleXYSeries getSeries() {
         return (SimpleXYSeries) series;
     }
 
-    public FadeFormatter getFormatter(){
+    public FadeFormatter getFormatter() {
         return formatter;
     }
 
-    public void sendSingleSample(float mV){
+    public void sendSingleSample(float mV) {
         plotNumbers[dataIndex] = mV;
-        if(dataIndex >= plotNumbers.length - 1){
+        if (dataIndex >= plotNumbers.length - 1) {
             dataIndex = 0;
         }
-        if(dataIndex < plotNumbers.length - 1){
+        if (dataIndex < plotNumbers.length - 1) {
             plotNumbers[dataIndex + 1] = null;
         }
 
-        ((SimpleXYSeries) series).setModel(Arrays.asList(plotNumbers), SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
+        ((SimpleXYSeries) series).setModel(Arrays.asList(plotNumbers),
+                SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
         dataIndex++;
         listener.update();
     }
 
-    public void setListener(PlotterListener listener){
+    public void setListener(PlotterListener listener) {
         this.listener = listener;
     }
 
@@ -69,13 +73,14 @@ public class Plotter {
         }
 
         @Override
-        public Paint getLinePaint(int thisIndex, int latestIndex, int seriesSize) {
+        public Paint getLinePaint(int thisIndex, int latestIndex,
+                                  int seriesSize) {
             // offset from the latest index:
             int offset;
-            if(thisIndex > latestIndex) {
+            if (thisIndex > latestIndex) {
                 offset = latestIndex + (seriesSize - thisIndex);
             } else {
-                offset =  latestIndex - thisIndex;
+                offset = latestIndex - thisIndex;
             }
             float scale = 255f / trailSize;
             int alpha = (int) (255 - (offset * scale));
