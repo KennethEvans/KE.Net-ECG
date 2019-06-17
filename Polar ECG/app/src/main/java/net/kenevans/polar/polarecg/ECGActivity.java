@@ -5,6 +5,7 @@ import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.RectF;
@@ -43,7 +44,9 @@ import com.polar.polarecg.R;
 import org.reactivestreams.Publisher;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -86,7 +89,9 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
     private Disposable mEcgDisposable;
     private boolean mPlaying;
     private Menu mMenu;
-    private String DEVICE_ID;
+    private String mDeviceId;
+    private String mFirmware;
+    private String mBatteryLevel;
 
     // Used in Logging
     private long ecgTime0;
@@ -96,7 +101,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_ecg);
-        DEVICE_ID = getIntent().getStringExtra("id");
+        mDeviceId = getIntent().getStringExtra("id");
         mTextViewHR = findViewById(R.id.info);
         mTextViewFW = findViewById(R.id.fw);
         mTextViewTime = findViewById(R.id.time);
@@ -159,13 +164,15 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 
             @Override
             public void fwInformationReceived(String s, String s1) {
-                String msg = "Firmware: " + s1.trim();
-                Log.d(TAG, "Firmware: " + s + " " + s1.trim());
+                mFirmware = s1.trim();
+                String msg = "Firmware: " + mFirmware;
+                Log.d(TAG, "Firmware: " + s + " " + mFirmware);
                 mTextViewFW.append(msg + "\n");
             }
 
             @Override
             public void batteryLevelReceived(String s, int i) {
+                mBatteryLevel = Integer.toString(i);
                 String msg = "ID: " + s + "\nBattery level: " + i;
                 Log.d(TAG, "Battery level " + s + " " + i);
                 mTextViewFW.append(msg + "\n");
@@ -181,7 +188,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                 }
             }
         });
-        mApi.connectToPolarDevice(DEVICE_ID);
+        mApi.connectToPolarDevice(mDeviceId);
         mPlaying = true;
     }
 
@@ -237,13 +244,15 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                     getDrawable(getResources(),
                             R.drawable.ic_pause_white_36dp, null));
             mMenu.findItem(R.id.pause).setTitle("Pause");
-            mMenu.findItem(R.id.save).setVisible(false);
+            mMenu.findItem(R.id.save_data).setVisible(false);
+            mMenu.findItem(R.id.save_plot).setVisible(false);
         } else {
             mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
                     getDrawable(getResources(),
                             R.drawable.ic_play_arrow_white_36dp, null));
             mMenu.findItem(R.id.pause).setTitle("Start");
-            mMenu.findItem(R.id.save).setVisible(mAllowWrite && true);
+            mMenu.findItem(R.id.save_data).setVisible(mAllowWrite && true);
+            mMenu.findItem(R.id.save_plot).setVisible(mAllowWrite && true);
         }
         return true;
     }
@@ -261,7 +270,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                             getDrawable(getResources(),
                                     R.drawable.ic_play_arrow_white_36dp, null));
                     mMenu.findItem(R.id.pause).setTitle("Start");
-                    mMenu.findItem(R.id.save).setVisible(mAllowWrite && true);
+                    mMenu.findItem(R.id.save_data).setVisible(mAllowWrite && true);
+                    mMenu.findItem(R.id.save_plot).setVisible(mAllowWrite && true);
                 } else {
                     // Turn it on
                     mPlaying = true;
@@ -278,7 +288,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                             getDrawable(getResources(),
                                     R.drawable.ic_pause_white_36dp, null));
                     mMenu.findItem(R.id.pause).setTitle("Pause");
-                    mMenu.findItem(R.id.save).setVisible(false);
+                    mMenu.findItem(R.id.save_data).setVisible(false);
+                    mMenu.findItem(R.id.save_plot).setVisible(false);
                 }
                 return true;
             case R.id.stop:
@@ -292,10 +303,14 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                         getDrawable(getResources(),
                                 R.drawable.ic_play_arrow_white_36dp, null));
                 mMenu.findItem(R.id.pause).setTitle("Start");
-                mMenu.findItem(R.id.save).setVisible(mAllowWrite && true);
+                mMenu.findItem(R.id.save_data).setVisible(mAllowWrite && true);
+                mMenu.findItem(R.id.save_plot).setVisible(mAllowWrite && true);
                 return true;
-            case R.id.save:
-                save(null);
+            case R.id.save_plot:
+                savePlot(null);
+                return true;
+            case R.id.save_data:
+                saveData(null);
                 return true;
         }
         return false;
@@ -480,9 +495,9 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 
     /**
      * Save the current samples as a file.  Prompts for a note, then calls
-     * finishSave.
+     * finishSaveData.
      */
-    private void save(View view) {
+    private void savePlot(View view) {
         String msg;
         String state = Environment.getExternalStorageState();
         if (!Environment.MEDIA_MOUNTED.equals(state)) {
@@ -490,7 +505,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             Log.e(TAG, msg);
             Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
             return;
-        }// Get a note
+        }
+        // Get a note
         AlertDialog.Builder dialog = new AlertDialog.Builder(this,
                 R.style.PolarTheme);
         dialog.setTitle(R.string.note_dialog_title);
@@ -508,7 +524,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                 new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        finishSave(input.getText().toString());
+                        finishSavePlot(input.getText().toString());
                     }
                 });
         dialog.setNegativeButton(R.string.cancel,
@@ -521,11 +537,95 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
     }
 
     /**
-     * Finishes the save after getting the note.
+     * Save the current samples as a file.  Prompts for a note, then calls
+     * finishSaveData.
+     */
+    private void saveData(View view) {
+        String msg;
+        String state = Environment.getExternalStorageState();
+        if (!Environment.MEDIA_MOUNTED.equals(state)) {
+            msg = "External Storage is not available";
+            Log.e(TAG, msg);
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+            return;
+        }
+        // Get a note
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this,
+                R.style.PolarTheme);
+        dialog.setTitle(R.string.note_dialog_title);
+
+        View viewInflated = LayoutInflater.from(getApplicationContext()).
+                inflate(R.layout.device_id_dialog_layout,
+                        view == null ? null : (ViewGroup) view.getRootView(),
+                        false);
+
+        final EditText input = viewInflated.findViewById(R.id.input);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        dialog.setView(viewInflated);
+
+        dialog.setPositiveButton(R.string.ok,
+                new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        finishSaveData(input.getText().toString());
+                    }
+                });
+        dialog.setNegativeButton(R.string.cancel,
+                new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                });
+        dialog.show();
+    }
+
+    /**
+     * Finishes the savePlot after getting the note.
      *
      * @param note The note.
      */
-    private void finishSave(String note) {
+    private void finishSavePlot(String note) {
+        String msg;
+        File dir = Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS);
+        String format = "yyyy-MM-dd_HH-mm";
+        SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
+        Date now = new Date();
+        LinkedList<Number> vals = mPlotter.getSeries().getyVals();
+        int nSamples = vals.size();
+        String fileName = "PolarECG-" + df.format(now) + ".png";
+        File file = new File(dir, fileName);
+        Bitmap bm = EcgImage.createImage(this,
+                now.toString(),
+                mDeviceId,
+                mFirmware,
+                mBatteryLevel,
+                note,
+                mTextViewHR.getText().toString(),
+                String.format(Locale.US, "%.1f " +
+                        "sec", nSamples / 130.),
+                vals);
+        try {
+            FileOutputStream strm = new FileOutputStream(file);
+            bm.compress(Bitmap.CompressFormat.PNG, 80, strm);
+            strm.close();
+            msg = "Wrote " + file.getPath();
+            Log.d(TAG, msg);
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+        } catch (IOException ex) {
+            msg = "Error writing " + file.getPath();
+            Log.e(TAG, msg);
+            Log.e(TAG, Log.getStackTraceString(ex));
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /**
+     * Finishes the saveData after getting the note.
+     *
+     * @param note The note.
+     */
+    private void finishSaveData(String note) {
         String msg;
         File dir = Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_DOWNLOADS);
@@ -578,7 +678,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
     public void streamECG() {
         if (mEcgDisposable == null) {
             mEcgDisposable =
-                    mApi.requestEcgSettings(DEVICE_ID).
+                    mApi.requestEcgSettings(mDeviceId).
                             toFlowable().
                             flatMap(new Function<PolarSensorSetting,
                                     Publisher<PolarEcgData>>() {
@@ -599,7 +699,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
 //                                            .maxSettings().settings.
 //                                            get(PolarSensorSetting
 //                                            .SettingType.RANGE));
-                                    return mApi.startEcgStreaming(DEVICE_ID,
+                                    return mApi.startEcgStreaming(mDeviceId,
                                             sensorSetting.maxSettings());
                                 }
                             }).observeOn(AndroidSchedulers.mainThread()).subscribe(

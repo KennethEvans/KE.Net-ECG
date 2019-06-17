@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Polar ECG</string>
+    <string name="app_name">KE.Net ECG</string>
     <string name="plot_title">25 mm/s, 10 mm/mV</string>
     <string name="plot_range_title">mV</string>
     <string name="plot_domain_title">msec</string>
@@ -16,7 +16,8 @@
     <string name="pause_item">Pause</string>
     <string name="play_item">Play</string>
     <string name="stop_item">Stop</string>
-    <string name="save_item">Save</string>
+    <string name="save_data_item">Save Data</string>
+    <string name="save_plot_item">Save Plot</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
 </resources>
