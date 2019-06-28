@@ -77,6 +77,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
     private static final String PREF_ALLOW_WRITE_EXTERNAL_STORAGE =
             "allowWriteExternalStorage";
 
+    private enum SAVE_TYPE {DATA, PLOT, BOTH}
+
     private boolean mPromptForWriteExternalStorage = true;
     private boolean mAllowWrite = false;
 
@@ -246,6 +248,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             mMenu.findItem(R.id.pause).setTitle("Pause");
             mMenu.findItem(R.id.save_data).setVisible(false);
             mMenu.findItem(R.id.save_plot).setVisible(false);
+            mMenu.findItem(R.id.save_both).setVisible(false);
         } else {
             mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
                     getDrawable(getResources(),
@@ -253,6 +256,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             mMenu.findItem(R.id.pause).setTitle("Start");
             mMenu.findItem(R.id.save_data).setVisible(mAllowWrite && true);
             mMenu.findItem(R.id.save_plot).setVisible(mAllowWrite && true);
+            mMenu.findItem(R.id.save_both).setVisible(mAllowWrite && true);
         }
         return true;
     }
@@ -272,6 +276,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                     mMenu.findItem(R.id.pause).setTitle("Start");
                     mMenu.findItem(R.id.save_data).setVisible(mAllowWrite && true);
                     mMenu.findItem(R.id.save_plot).setVisible(mAllowWrite && true);
+                    mMenu.findItem(R.id.save_both).setVisible(mAllowWrite && true);
                 } else {
                     // Turn it on
                     mPlaying = true;
@@ -290,6 +295,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                     mMenu.findItem(R.id.pause).setTitle("Pause");
                     mMenu.findItem(R.id.save_data).setVisible(false);
                     mMenu.findItem(R.id.save_plot).setVisible(false);
+                    mMenu.findItem(R.id.save_both).setVisible(false);
                 }
                 return true;
             case R.id.stop:
@@ -305,12 +311,16 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                 mMenu.findItem(R.id.pause).setTitle("Start");
                 mMenu.findItem(R.id.save_data).setVisible(mAllowWrite && true);
                 mMenu.findItem(R.id.save_plot).setVisible(mAllowWrite && true);
+                mMenu.findItem(R.id.save_both).setVisible(mAllowWrite && true);
                 return true;
             case R.id.save_plot:
-                savePlot(null);
+                saveData(null, SAVE_TYPE.PLOT);
                 return true;
             case R.id.save_data:
-                saveData(null);
+                saveData(null, SAVE_TYPE.DATA);
+                return true;
+            case R.id.save_both:
+                saveData(null, SAVE_TYPE.BOTH);
                 return true;
         }
         return false;
@@ -503,7 +513,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         if (!Environment.MEDIA_MOUNTED.equals(state)) {
             msg = "External Storage is not available";
             Log.e(TAG, msg);
-            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+            Utils.errMsg(this, msg);
             return;
         }
         // Get a note
@@ -540,13 +550,13 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
      * Save the current samples as a file.  Prompts for a note, then calls
      * finishSaveData.
      */
-    private void saveData(View view) {
+    private void saveData(View view, final SAVE_TYPE saveType) {
         String msg;
         String state = Environment.getExternalStorageState();
         if (!Environment.MEDIA_MOUNTED.equals(state)) {
             msg = "External Storage is not available";
             Log.e(TAG, msg);
-            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+            Utils.errMsg(this, msg);
             return;
         }
         // Get a note
@@ -567,7 +577,18 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                 new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        finishSaveData(input.getText().toString());
+                        switch (saveType) {
+                            case DATA:
+                                finishSaveData(input.getText().toString());
+                                break;
+                            case PLOT:
+                                finishSavePlot(input.getText().toString());
+                                break;
+                            case BOTH:
+                                finishSaveData(input.getText().toString());
+                                finishSavePlot(input.getText().toString());
+                                break;
+                        }
                     }
                 });
         dialog.setNegativeButton(R.string.cancel,
@@ -611,12 +632,12 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             strm.close();
             msg = "Wrote " + file.getPath();
             Log.d(TAG, msg);
-            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+            Utils.infoMsg(this, msg);
         } catch (IOException ex) {
             msg = "Error writing " + file.getPath();
             Log.e(TAG, msg);
             Log.e(TAG, Log.getStackTraceString(ex));
-            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+            Utils.excMsg(this, msg, ex);
         }
     }
 
@@ -655,12 +676,12 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             out.flush();
             msg = "Wrote " + file.getPath();
             Log.d(TAG, msg);
-            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+            Utils.infoMsg(this, msg);
         } catch (Exception ex) {
             msg = "Error writing " + file.getPath();
             Log.e(TAG, msg);
             Log.e(TAG, Log.getStackTraceString(ex));
-            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+            Utils.excMsg(this, msg, ex);
         } finally {
             if (out != null) {
                 try {

@@ -18,6 +18,13 @@
     <string name="stop_item">Stop</string>
     <string name="save_data_item">Save Data</string>
     <string name="save_plot_item">Save Plot</string>
+    <string name="save_both_item">Save Both</string>
+
+    <!-- Utils -->
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
+    <string name="error">Error</string>
+    <string name="exception">Exception</string>
+    <string name="info">Info</string>
+    <string name="warning">Warning</string>
 </resources>

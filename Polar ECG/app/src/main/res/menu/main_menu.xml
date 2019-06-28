@@ -22,4 +22,9 @@
         android:title="@string/save_data_item"
         app:showAsAction="never"
         />
+    <item
+        android:id="@+id/save_both"
+        android:title="@string/save_both_item"
+        app:showAsAction="never"
+        />
 </menu>
