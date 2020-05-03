@@ -1,8 +1,7 @@
-# Polar SDK
+# KE.Net ECG
 
-Polar  SDK contains Android projects related to the Polar BLE SDK located at https://kenevans.nethttps://github.com/polarofficial/polar-ble-sdk/opensource/ArtPad/Help/Overview.html
+KE.net ECG is an Android application that implements getting an ECG from a Polar H10 heart monitor.
 
-These projects vary from demos and examples in their repository with few changes to ones with more enhancements to more developed applications using the SDK.  It could be viewed as a sandbox.
-
+It uses the Polar SDK located at  https://github.com/polarofficial/polar-ble-sdk.
 
 Licensed under the MIT license. (See: https://en.wikipedia.org/wiki/MIT_License)

@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">KE.Net ECG</string>
+    <string name="plot_title">25 mm/s, 10 mm/mV</string>
+    <string name="plot_range_title">mV</string>
+    <string name="plot_domain_title">msec</string>
+    <string name="note_dialog_title">Enter a Note</string>
+    <string name="device_id_dialog_title">Enter your Polar device\'s ID</string>
+    <string name="disconnect">DISCONNECT</string>
+    <string name="connect">CONNECT ECG</string>
+    <string name="connect2">CONNECT HR/RR</string>
+    <string name="connecting">Connecting to device</string>
+    <string name="noDevice">There is no device defined</string>
+    <string name="connected">Connected!</string>
+    <string name="device_id">device_id</string>
+    <string name="set_id_button">Change device ID</string>
+    <string name="elapsed_time">%1$.1f sec"</string>
+    <string name="pause_item">Pause</string>
+    <string name="play_item">Play</string>
+    <string name="stop_item">Stop</string>
+    <string name="save_data_item">Save Data</string>
+    <string name="save_plot_item">Save Plot</string>
+    <string name="save_both_item">Save Both</string>
+    <string name="info_item">Info</string>
+    <string name="device_id_item">Set Device ID</string>
+
+    <!-- Utils -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="error">Error</string>
+    <string name="exception">Exception</string>
+    <string name="info">Info</string>
+    <string name="warning">Warning</string>
+</resources>
