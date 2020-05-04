@@ -53,14 +53,18 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.Locale;
+import java.util.UUID;
 
+import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import polar.com.sdk.api.PolarBleApi;
+import polar.com.sdk.api.PolarBleApiCallback;
 import polar.com.sdk.api.PolarBleApiDefaultImpl;
+import polar.com.sdk.api.errors.PolarInvalidArgument;
 import polar.com.sdk.api.model.PolarDeviceInfo;
 import polar.com.sdk.api.model.PolarEcgData;
 import polar.com.sdk.api.model.PolarHrData;
@@ -127,6 +131,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
     protected void onPause() {
         Log.v(TAG, this.getClass().getSimpleName() + " onPause");
         super.onPause();
+
+        if(mApi != null) mApi.backgroundEntered();
     }
 
     @Override
@@ -134,6 +140,9 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         Log.v(TAG, this.getClass().getSimpleName() + " onResume:"
                 + " mOrientationChanged=" + mOrientationChanged);
         super.onResume();
+
+        if(mApi != null) mApi.foregroundEntered();
+
         // Handle prompting for permissions
         mAllowWrite = ContextCompat.checkSelfPermission(this, Manifest
                 .permission.WRITE_EXTERNAL_STORAGE) == PackageManager
@@ -313,7 +322,16 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                                 streamECG();
                             }
                             if (mApi != null) {
-                                mApi.disconnectFromPolarDevice(oldDeviceId);
+                                try {
+                                    mApi.disconnectFromDevice(mDeviceId);
+                                } catch (PolarInvalidArgument ex) {
+                                    String msg = "disconnectFromDevice: Bad " +
+                                            "argument: mDeviceId"
+                                            + mDeviceId;
+                                    Utils.excMsg(ECGActivity.this, msg, ex);
+                                    Log.d(TAG, this.getClass().getSimpleName()
+                                            + " showDeviceIdDialog: " + msg);
+                                }
                                 mApi = null;
                             }
                             mPlaying = false;
@@ -674,8 +692,11 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                     .append(getString(R.string.elapsed_time, elapsed)).append("\n");
             msg.append("Points plotted: ")
                     .append(mPlotter.getSeries().getyVals().size()).append(
-                            "\n");
+                    "\n");
         }
+        Single<PolarSensorSetting> ecgSettings = mApi.requestEcgSettings(mDeviceId);
+        msg.append("Polar BLE API Version: ").
+                append(PolarBleApiDefaultImpl.versionInfo()).append("\n");
         msg.append("Location Permission: ")
                 .append((ContextCompat.checkSelfPermission(this, Manifest
                         .permission.ACCESS_FINE_LOCATION) == PackageManager
@@ -846,21 +867,21 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                         PolarBleApi.FEATURE_BATTERY_INFO |
                         PolarBleApi.FEATURE_DEVICE_INFO |
                         PolarBleApi.FEATURE_HR);
-        mApi.setApiCallback(new PolarBleApiCallbackAdapter() {
+        mApi.setApiCallback(new PolarBleApiCallback() {
             @Override
             public void blePowerStateChanged(boolean b) {
                 Log.d(TAG, "*BluetoothStateChanged " + b);
             }
 
             @Override
-            public void polarDeviceConnected(PolarDeviceInfo s) {
+            public void deviceConnected(PolarDeviceInfo s) {
                 Log.d(TAG, "*Device connected " + s.deviceId);
                 Toast.makeText(ECGActivity.this, R.string.connected,
                         Toast.LENGTH_SHORT).show();
             }
 
             @Override
-            public void polarDeviceDisconnected(PolarDeviceInfo s) {
+            public void deviceDisconnected(PolarDeviceInfo s) {
                 Log.d(TAG, "*Device disconnected " + s);
             }
 
@@ -876,11 +897,14 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             }
 
             @Override
-            public void fwInformationReceived(String s, String s1) {
-                mFirmware = s1.trim();
-                String msg = "Firmware: " + mFirmware;
-                Log.d(TAG, "*Firmware: " + s + " " + mFirmware);
-                mTextViewFW.append(msg + "\n");
+            public void disInformationReceived(String s, UUID u, String s1) {
+                if (u.equals(UUID.fromString("00002a28-0000-1000-8000" +
+                        "-00805f9b34fb"))) {
+                    mFirmware = s1.trim();
+                    String msg = "Firmware: " + mFirmware;
+                    Log.d(TAG, "*Firmware: " + s + " " + mFirmware);
+                    mTextViewFW.append(msg + "\n");
+                }
             }
 
             @Override
@@ -901,8 +925,15 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
                 }
             }
         });
-        mApi.connectToPolarDevice(mDeviceId);
-        mPlaying = true;
+        try {
+            mApi.connectToDevice(mDeviceId);
+            mPlaying = true;
+        } catch (PolarInvalidArgument ex) {
+            String msg = "connectToDevice: Bad argument: mDeviceId" + mDeviceId;
+            Utils.excMsg(this, msg, ex);
+            Log.d(TAG, "    restart: " + msg);
+            mPlaying = false;
+        }
         invalidateOptionsMenu();
         Log.d(TAG, "    restart(end) mApi=" + mApi + " mPlaying=" + mPlaying);
     }
