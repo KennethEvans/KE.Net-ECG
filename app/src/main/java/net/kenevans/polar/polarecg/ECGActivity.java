@@ -41,7 +41,6 @@ import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
-import com.polar.polarecg.R;
 
 import org.reactivestreams.Publisher;
 
@@ -117,8 +116,7 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         // Start Bluetooth
         checkBT();
         mDeviceId = sharedPreferences.getString(sharedPrefsKey, "");
-        Log.d(TAG, this.getClass().getSimpleName() + " onCreate: "
-                + "mDeviceId=" + mDeviceId);
+        Log.d(TAG, "    mDeviceId=" + mDeviceId);
 
         if (mDeviceId == null || mDeviceId.equals("")) {
             showDeviceIdDialog(null);
@@ -363,16 +361,15 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
      */
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
+        Log.v(TAG, this.getClass().getSimpleName() +
+                " onConfigurationChanged");
         super.onConfigurationChanged(newConfig);
 
         if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            Log.v(TAG, this.getClass().getSimpleName() +
-                    " onConfigurationChanged: Landscape");
+            Log.v(TAG, "    Landscape");
         } else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT) {
-            Log.v(TAG, this.getClass().getSimpleName() +
-                    " onConfigurationChanged: Portrait");
+            Log.v(TAG, "    Portrait");
         }
-
         // Cannot do this now as the screen changes have only been dispatched
         mOrientationChanged = true;
         mPlot.post(new Runnable() {
@@ -427,10 +424,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         Log.d(TAG, this.getClass().getSimpleName() + " " +
                 "requestWriteExternalStoragePermission");
         Log.d(TAG, "    Build.VERSION.SDK_INT=" + Build.VERSION.SDK_INT);
-        // This is not available before API 16
-        if (Build.VERSION.SDK_INT < 16) return;
-        Log.d(TAG,
-                "    ACCESS_WRITE_EXTERNAL_STORAGE_REQ=" + ACCESS_WRITE_EXTERNAL_STORAGE_REQ);
+        Log.d(TAG, "    ACCESS_WRITE_EXTERNAL_STORAGE_REQ="
+                + ACCESS_WRITE_EXTERNAL_STORAGE_REQ);
         ActivityCompat.requestPermissions(this, new String[]{Manifest
                         .permission.WRITE_EXTERNAL_STORAGE},
                 ACCESS_WRITE_EXTERNAL_STORAGE_REQ);
@@ -633,10 +628,8 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
         Date now = new Date();
         String fileName = "PolarECG-" + df.format(now) + ".csv";
         File file = new File(dir, fileName);
-        PrintWriter out = null;
-        try {
+        try (PrintWriter out = new PrintWriter(new FileWriter(file))) {
             // Write header
-            out = new PrintWriter(new FileWriter(file));
             out.write(now.toString() + "\n");
             // The text for this TextView already has a \n
             out.write(mTextViewFW.getText().toString());
@@ -660,40 +653,37 @@ public class ECGActivity extends AppCompatActivity implements PlotterListener {
             Log.e(TAG, msg);
             Log.e(TAG, Log.getStackTraceString(ex));
             Utils.excMsg(this, msg, ex);
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (Exception ex) {
-                    // Do nothing
-                }
-            }
         }
+        // Do nothing
     }
 
     public void info() {
         StringBuilder msg = new StringBuilder();
-        msg.append("Device Id: " + mDeviceId).append("\n");
-        msg.append("Firmware: " + mFirmware).append("\n");
-        msg.append("Battery Level: " + mBatteryLevel).append("\n");
-        msg.append("Connected: " + (mApi != null)).append("\n");
-        msg.append("Playing: " + mPlaying).append("\n");
-        msg.append("Receiving ECG: " + (mEcgDisposable != null)).append("\n");
+        msg.append("Device Id: ").append(mDeviceId).append("\n");
+        msg.append("Firmware: ").append(mFirmware).append("\n");
+        msg.append("Battery Level: ").append(mBatteryLevel).append("\n");
+        msg.append("Connected: ").append((mApi != null)).append("\n");
+        msg.append("Playing: ").append(mPlaying).append("\n");
+        msg.append("Receiving ECG: ").append(mEcgDisposable != null).append(
+                "\n");
         if (mPlotter != null && mPlotter.getSeries() !=
                 null && mPlotter.getSeries().getyVals() != null) {
-            msg.append("Points plotted: "
-                    + mPlotter.getSeries().getyVals().size()).append("\n");
-        } else {
-            msg.append("Points plotted: Not plotting").append("\n");
+            double elapsed =
+                    mPlotter.getDataIndex() / 130.;
+            msg.append("Elapsed Time: ")
+                    .append(getString(R.string.elapsed_time, elapsed)).append("\n");
+            msg.append("Points plotted: ")
+                    .append(mPlotter.getSeries().getyVals().size()).append(
+                            "\n");
         }
-        msg.append("Location Permission: "
-                + (ContextCompat.checkSelfPermission(this, Manifest
-                .permission.ACCESS_FINE_LOCATION) == PackageManager
-                .PERMISSION_GRANTED)).append("\n");
-        msg.append("Storage Permission: "
-                + (ContextCompat.checkSelfPermission(this, Manifest
-                .permission.WRITE_EXTERNAL_STORAGE) == PackageManager
-                .PERMISSION_GRANTED)).append("\n");
+        msg.append("Location Permission: ")
+                .append((ContextCompat.checkSelfPermission(this, Manifest
+                        .permission.ACCESS_FINE_LOCATION) == PackageManager
+                        .PERMISSION_GRANTED)).append("\n");
+        msg.append("Storage Permission: ")
+                .append((ContextCompat.checkSelfPermission(this, Manifest
+                        .permission.WRITE_EXTERNAL_STORAGE) == PackageManager
+                        .PERMISSION_GRANTED)).append("\n");
         Utils.infoMsg(this, msg.toString());
     }
 

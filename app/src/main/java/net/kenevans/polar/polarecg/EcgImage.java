@@ -8,8 +8,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 
-import com.polar.polarecg.R;
-
 import java.util.LinkedList;
 
 /*
@@ -17,7 +15,7 @@ import java.util.LinkedList;
  * By Kenneth Evans, Jr.
  */
 
-public class EcgImage {
+class EcgImage {
     private static final String DEST_DIR = "C:/Scratch/ECG/Polar ECG/Images";
     private static final String SRC_DIR = "C:/Scratch/ECG/Polar ECG/CSV Files";
     private static final int WIDTH = 2550;
@@ -39,11 +37,11 @@ public class EcgImage {
     private static float OUTLINE_WIDTH = 5f;
     private static float CURVE_WIDTH = 3f;
 
-    public static Bitmap createImage(Context context, String date, String id,
-                                     String firmware,
-                                     String batteryLevel,
-                                     String notes, String hr, String duration,
-                                     LinkedList<Number> vals) {
+    static Bitmap createImage(Context context, String date, String id,
+                              String firmware,
+                              String batteryLevel,
+                              String notes, String hr, String duration,
+                              LinkedList<Number> vals) {
         Bitmap bm = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888);
         bm.eraseColor(Color.WHITE);
         Canvas canvas = new Canvas(bm);

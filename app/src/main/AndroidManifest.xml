@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="com.polar.polarecg">
+          package="net.kenevans.polar.polarecg">
 
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -16,6 +16,7 @@
         android:theme="@style/AppTheme">
         <activity
             android:name="net.kenevans.polar.polarecg.ECGActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
             >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

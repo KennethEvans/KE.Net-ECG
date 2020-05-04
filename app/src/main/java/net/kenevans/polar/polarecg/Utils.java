@@ -27,8 +27,6 @@ import android.content.DialogInterface;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
 
-import com.polar.polarecg.R;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
@@ -44,7 +42,7 @@ public class Utils {
      * @param msg     The dialog message.
      */
     @SuppressWarnings("unused")
-    public static void alert(Context context, String title, String msg) {
+    private static void alert(Context context, String title, String msg) {
         try {
             AlertDialog alertDialog =
                     new AlertDialog.Builder(new ContextThemeWrapper(context,
@@ -72,7 +70,7 @@ public class Utils {
      * @param msg     The dialog message.
      */
     @SuppressWarnings("unused")
-    public static void errMsg(Context context, String msg) {
+    static void errMsg(Context context, String msg) {
         Log.e(TAG, getContextTag(context) + msg);
         alert(context, context.getText(R.string.error).toString(), msg);
     }
@@ -96,7 +94,7 @@ public class Utils {
      * @param msg     The dialog message.
      */
     @SuppressWarnings("unused")
-    public static void infoMsg(Context context, String msg) {
+    static void infoMsg(Context context, String msg) {
         Log.i(TAG, getContextTag(context) + msg);
         alert(context, context.getText(R.string.info).toString(), msg);
     }
@@ -110,7 +108,7 @@ public class Utils {
      * @param t       The throwable.
      */
     @SuppressWarnings("unused")
-    public static void excMsg(Context context, String msg, Throwable t) {
+    static void excMsg(Context context, String msg, Throwable t) {
         String fullMsg = msg += "\n"
                 + context.getText(R.string.exception).toString() + ": " + t
                 + "\n" + t.getMessage();
@@ -126,7 +124,7 @@ public class Utils {
      * @return The context tag.
      */
     @SuppressWarnings("unused")
-    public static String getContextTag(Context context) {
+    private static String getContextTag(Context context) {
         if (context == null) {
             return "<???>: ";
         }
