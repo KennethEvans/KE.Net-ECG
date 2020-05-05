@@ -4,10 +4,6 @@ local.properties
 .idea/
 .DS_Store
 build
+release
 captures
 .externalNativeBuild
-PolarBleSdkTestApp/
-polar-sdk-android/
-polar-sdk-android-no-filter/
-polar-sdk-android-no-polar-filter/
-PolarSDK-Exercise-Demo/

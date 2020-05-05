@@ -7,13 +7,20 @@ android {
         minSdkVersion 21
         targetSdkVersion 28
         versionCode 3
-        versionName "1.2"
+        versionName "1.2.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            applicationVariants.all { variant ->
+                variant.outputs.all { output ->
+                    def appName = "KE.Net ECG"
+                    def formattedDate = new Date().format('yyyyMMddHHmmss')
+                    outputFileName = "${appName}-${variant.versionName}-${variant.name}-${formattedDate}.apk"
+                }
+            }
         }
     }
 }
