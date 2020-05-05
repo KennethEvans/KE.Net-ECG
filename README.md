@@ -4,4 +4,8 @@ KE.Net ECG is an Android application that implements getting an ECG from a Polar
 
 It uses the Polar SDK located at  https://github.com/polarofficial/polar-ble-sdk.
 
+**More information**
+
+More information and FAQ are at https://kennethevans.github.io as well as more projects from the same author.
+
 Licensed under the MIT license. (See: https://en.wikipedia.org/wiki/MIT_License)
