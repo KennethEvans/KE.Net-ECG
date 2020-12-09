@@ -3,7 +3,6 @@ package net.kenevans.polar.polarecg;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.content.ContentResolver;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -18,6 +17,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
+import android.preference.PreferenceManager;
 import android.provider.DocumentsContract;
 import android.text.InputType;
 import android.util.DisplayMetrics;
@@ -74,7 +74,7 @@ import polar.com.sdk.api.model.PolarSensorSetting;
 
 public class ECGActivity extends AppCompatActivity implements IConstants,
         PlotterListener {
-    SharedPreferences sharedPreferences;
+    SharedPreferences mSharedPreferences;
     // The total number of points = 26 * total large blocks desired
     private static final int N_TOTAL_POINTS = 3900;  // 150 = 30 sec
     private static final int N_PLOT_POINTS = 520;    // 20 points
@@ -111,11 +111,12 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         mTextViewTime = findViewById(R.id.time);
         mPlot = findViewById(R.id.plot);
 
-        sharedPreferences = this.getPreferences(Context.MODE_PRIVATE);
+        mSharedPreferences = PreferenceManager
+                .getDefaultSharedPreferences(this);
 
         // Start Bluetooth
         checkBT();
-        mDeviceId = sharedPreferences.getString(PREF_DEVICE_ID, "");
+        mDeviceId = mSharedPreferences.getString(PREF_DEVICE_ID, "");
         Log.d(TAG, "    mDeviceId=" + mDeviceId);
 
         if (mDeviceId == null || mDeviceId.equals("")) {
@@ -157,7 +158,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         // Start the connection to the device
         Log.d(TAG, "    mDeviceId=" + mDeviceId);
         Log.d(TAG, "    mApi=" + mApi);
-        mDeviceId = sharedPreferences.getString(PREF_DEVICE_ID, "");
+        mDeviceId = mSharedPreferences.getString(PREF_DEVICE_ID, "");
         if (mDeviceId == null || mDeviceId.isEmpty()) {
             Toast.makeText(this,
                     getString(R.string.noDevice),
@@ -312,7 +313,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
      * @param newConfig The new configuration.
      */
     @Override
-    public void onConfigurationChanged(Configuration newConfig) {
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
         Log.v(TAG, this.getClass().getSimpleName() +
                 " onConfigurationChanged");
         super.onConfigurationChanged(newConfig);
@@ -367,7 +368,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 
         final EditText input = viewInflated.findViewById(R.id.input);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
-        mDeviceId = sharedPreferences.getString(PREF_DEVICE_ID, "");
+        mDeviceId = mSharedPreferences.getString(PREF_DEVICE_ID, "");
         input.setText(mDeviceId);
         dialog.setView(viewInflated);
 
@@ -381,7 +382,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                                 + oldDeviceId + " newDeviceId="
                                 + mDeviceId);
                         SharedPreferences.Editor editor =
-                                sharedPreferences.edit();
+                                mSharedPreferences.edit();
                         editor.putString(PREF_DEVICE_ID, mDeviceId);
                         editor.apply();
                         if (!oldDeviceId.equals(mDeviceId)) {
