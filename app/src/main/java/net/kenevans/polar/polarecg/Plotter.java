@@ -6,6 +6,7 @@ import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
 import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.XYPlot;
+import com.androidplot.xy.XYRegionFormatter;
 import com.androidplot.xy.XYSeriesFormatter;
 
 import polar.com.sdk.api.model.PolarEcgData;
@@ -17,7 +18,7 @@ public class Plotter {
     private String TAG = "Polar_Plotter";
     private PlotterListener listener;
     private Number[] plotNumbers = new Number[500];
-    private XYSeriesFormatter formatter;
+    private XYSeriesFormatter<XYRegionFormatter> formatter;
     private SimpleXYSeries series;
     /**
      * The next index in the data
@@ -52,7 +53,7 @@ public class Plotter {
         return series;
     }
 
-    public XYSeriesFormatter getFormatter() {
+    public XYSeriesFormatter<XYRegionFormatter> getFormatter() {
         return formatter;
     }
 
@@ -63,8 +64,8 @@ public class Plotter {
      * @param polarEcgData The data that came in.
      */
     public void addValues(XYPlot plot, PolarEcgData polarEcgData) {
-        Log.d(TAG,
-                "addValues: dataIndex=" + dataIndex + " seriesSize=" + series.size());
+//        Log.d(TAG,
+//                "addValues: dataIndex=" + dataIndex + " seriesSize=" + series.size());
         int nSamples = polarEcgData.samples.size();
         if (nSamples == 0) return;
 

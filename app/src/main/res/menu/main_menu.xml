@@ -4,7 +4,7 @@
         android:id="@+id/pause"
         android:icon="@drawable/ic_pause_white_36dp"
         android:title="@string/pause_item"
-        app:showAsAction="always"
+        app:showAsAction="ifRoom"
         />
     <item
         android:id="@+id/save_plot"
@@ -29,6 +29,10 @@
     <item
         android:id="@+id/device_id"
         android:title="@string/device_id_item"
+        app:showAsAction="never"
+        />
+    <item android:id="@+id/choose_data_directory"
+        android:title="@string/choose_data_directory_item"
         app:showAsAction="never"
         />
 </menu>
