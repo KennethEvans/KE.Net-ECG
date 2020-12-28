@@ -16,8 +16,6 @@ import java.util.LinkedList;
  */
 
 class EcgImage {
-    private static final String DEST_DIR = "C:/Scratch/ECG/Polar ECG/Images";
-    private static final String SRC_DIR = "C:/Scratch/ECG/Polar ECG/CSV Files";
     private static final int WIDTH = 2550;
     private static final int HEIGHT = 3300;
     private static final int GRAPH_WIDTH = 40 * 5;
@@ -26,16 +24,16 @@ class EcgImage {
     private static final int GRAPH_Y = 31;
     private static final float SCALE = 11.8f;
     private static final String IMAGE_TYPE = "png";
-    private static int MINOR_COLOR = 0xffd1d1d1;
-    private static int MAJOR_COLOR = 0xff8c8c8c;
-    private static int BLOCK_COLOR = 0xff333333;
-    private static int OUTLINE_COLOR = 0xff000000;
-    private static int CURVE_COLOR = 0xff000000;
-    private static float MINOR_WIDTH = 1f;
-    private static float MAJOR_WIDTH = 2f;
-    private static float BLOCK_WIDTH = 3f;
-    private static float OUTLINE_WIDTH = 5f;
-    private static float CURVE_WIDTH = 3f;
+    private static final int MINOR_COLOR = 0xffd1d1d1;
+    private static final int MAJOR_COLOR = 0xff8c8c8c;
+    private static final int BLOCK_COLOR = 0xff333333;
+    private static final int OUTLINE_COLOR = 0xff000000;
+    private static final int CURVE_COLOR = 0xff000000;
+    private static final float MINOR_WIDTH = 1f;
+    private static final float MAJOR_WIDTH = 2f;
+    private static final float BLOCK_WIDTH = 3f;
+    private static final float OUTLINE_WIDTH = 5f;
+    private static final float CURVE_WIDTH = 3f;
 
     static Bitmap createImage(Context context, String date, String id,
                               String firmware,
@@ -167,7 +165,6 @@ class EcgImage {
         float offsetX = GRAPH_X;
         float offsetY = GRAPH_Y + 30;
         float valueStep = 1.f / (130.f * .04f);
-        int nSamples = vals.size();
         for (Number val : vals) {
             x = index * valueStep;
             y = -10.f * val.floatValue();

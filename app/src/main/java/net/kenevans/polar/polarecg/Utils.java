@@ -31,9 +31,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 
-public class Utils {
-    private static String TAG = "Polar_ECGActivity";
-
+public class Utils implements IConstants {
     /**
      * General alert dialog.
      *
@@ -132,7 +130,7 @@ public class Utils {
     }
 
     /**
-     * Get the stack trace for a throwble as a String.
+     * Get the stack trace for a throwable as a String.
      *
      * @param t The throwable.
      * @return The stack trace as a String.

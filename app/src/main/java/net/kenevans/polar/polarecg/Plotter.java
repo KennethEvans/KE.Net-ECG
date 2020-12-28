@@ -1,7 +1,5 @@
 package net.kenevans.polar.polarecg;
 
-import android.util.Log;
-
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
 import com.androidplot.xy.SimpleXYSeries;
@@ -12,49 +10,45 @@ import com.androidplot.xy.XYSeriesFormatter;
 import polar.com.sdk.api.model.PolarEcgData;
 
 @SuppressWarnings("WeakerAccess")
-public class Plotter {
+public class Plotter implements IConstants {
 
-    String title;
-    private String TAG = "Polar_Plotter";
-    private PlotterListener listener;
-    private Number[] plotNumbers = new Number[500];
-    private XYSeriesFormatter<XYRegionFormatter> formatter;
-    private SimpleXYSeries series;
+    private PlotterListener mListener;
+    private final XYSeriesFormatter<XYRegionFormatter> mFormatter;
+    private final SimpleXYSeries mSeries;
     /**
      * The next index in the data
      */
-    private long dataIndex;
+    private long mDataIndex;
     /**
      * The number of points to show
      */
-    private int dataSize;
+    private final int mDataSize;
     /**
      * The total number of points to keep
      */
-    private int totalDataSize;
+    private final int mTotalDataSize;
 
 
     public Plotter(int totalDataSize, int dataSize,
                    String title,
                    Integer lineColor, boolean showVertices) {
-        this.title = title;
-        this.dataSize = dataSize;
-        this.totalDataSize = totalDataSize;
-        this.dataIndex = 0;
+        this.mDataSize = dataSize;
+        this.mTotalDataSize = totalDataSize;
+        this.mDataIndex = 0;
 
-        formatter = new LineAndPointFormatter(lineColor,
+        mFormatter = new LineAndPointFormatter(lineColor,
                 showVertices ? lineColor : null, null, null);
-        formatter.setLegendIconEnabled(false);
+        mFormatter.setLegendIconEnabled(false);
 
-        series = new SimpleXYSeries(title);
+        mSeries = new SimpleXYSeries(title);
     }
 
-    public SimpleXYSeries getSeries() {
-        return series;
+    public SimpleXYSeries getmSeries() {
+        return mSeries;
     }
 
-    public XYSeriesFormatter<XYRegionFormatter> getFormatter() {
-        return formatter;
+    public XYSeriesFormatter<XYRegionFormatter> getmFormatter() {
+        return mFormatter;
     }
 
     /**
@@ -71,11 +65,11 @@ public class Plotter {
 
         // Add the new values, removing old values if needed
         for (Integer val : polarEcgData.samples) {
-            if (series.size() >= totalDataSize) {
-                series.removeFirst();
+            if (mSeries.size() >= mTotalDataSize) {
+                mSeries.removeFirst();
             }
             // Convert from  μV to mV
-            series.addLast(dataIndex++, .001 * val);
+            mSeries.addLast(mDataIndex++, .001 * val);
             updatePlot(plot);
 //            Log.d(TAG, "addValues thread: " + Thread.currentThread()
 //            .getName());
@@ -84,31 +78,26 @@ public class Plotter {
 
     public void updatePlot(XYPlot plot) {
         long plotMin, plotMax;
-        if (dataIndex < dataSize) {
-            plotMin = dataIndex - dataSize;
-            plotMax = dataIndex;
-        } else {
-            plotMin = dataIndex - dataSize;
-            plotMax = dataIndex;
-        }
+        plotMin = mDataIndex - mDataSize;
+        plotMax = mDataIndex;
         plot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
-        listener.update();
+        mListener.update();
     }
 
     /**
      * Clear the plot and reset dataIndex;
      */
     public void clear() {
-        dataIndex = 0;
-        series.clear();
-        listener.update();
+        mDataIndex = 0;
+        mSeries.clear();
+        mListener.update();
     }
 
-    public void setListener(PlotterListener listener) {
-        this.listener = listener;
+    public void setmListener(PlotterListener mListener) {
+        this.mListener = mListener;
     }
 
-    public long getDataIndex() {
-        return dataIndex;
+    public long getmDataIndex() {
+        return mDataIndex;
     }
 }

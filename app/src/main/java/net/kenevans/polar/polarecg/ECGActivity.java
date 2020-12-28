@@ -17,7 +17,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
-import android.preference.PreferenceManager;
 import android.provider.DocumentsContract;
 import android.text.InputType;
 import android.util.DisplayMetrics;
@@ -110,9 +109,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         mTextViewFW = findViewById(R.id.fw);
         mTextViewTime = findViewById(R.id.time);
         mPlot = findViewById(R.id.plot);
-
-        mSharedPreferences = PreferenceManager
-                .getDefaultSharedPreferences(this);
+        mSharedPreferences = getPreferences(MODE_PRIVATE);
 
         // Start Bluetooth
         checkBT();
@@ -149,7 +146,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 public void run() {
                     mPlotter = new Plotter(N_TOTAL_POINTS, N_PLOT_POINTS,
                             "ECG", Color.RED, false);
-                    mPlotter.setListener(ECGActivity.this);
+                    mPlotter.setmListener(ECGActivity.this);
                     setupPlot();
                 }
             });
@@ -294,7 +291,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 this.getContentResolver().takePersistableUriPermission(treeUri,
                         takeFlags);
             } else {
-                Utils.errMsg(this, "Failed to get presistent access " +
+                Utils.errMsg(this, "Failed to get persistent access " +
                         "permissions");
             }
         }
@@ -486,7 +483,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         Log.d(TAG, "    display widthPixels=" + displayMetrics.widthPixels +
                 " heightPixels=" + displayMetrics.heightPixels);
 
-        mPlot.addSeries(mPlotter.getSeries(), mPlotter.getFormatter());
+        mPlot.addSeries(mPlotter.getmSeries(), mPlotter.getmFormatter());
         mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
         // Set the range block to be .1 mV so a large block will be .5 mV
         mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .1);
@@ -607,7 +604,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                     openFileDescriptor(docUri, "w");
             try (FileOutputStream strm =
                          new FileOutputStream(pfd.getFileDescriptor())) {
-                final LinkedList<Number> vals = mPlotter.getSeries().getyVals();
+                final LinkedList<Number> vals =
+                        mPlotter.getmSeries().getyVals();
                 final int nSamples = vals.size();
                 Bitmap bm = EcgImage.createImage(this,
                         now.toString(),
@@ -672,7 +670,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 out.write(note + "\n");
                 out.write("HR " + mTextViewHR.getText().toString() + "\n");
                 // Write samples
-                LinkedList<Number> vals = mPlotter.getSeries().getyVals();
+                LinkedList<Number> vals = mPlotter.getmSeries().getyVals();
                 int nSamples = vals.size();
                 out.write(nSamples + " values " + String.format(Locale.US, "%" +
                         ".1f " +
@@ -703,18 +701,16 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         msg.append("Playing: ").append(mPlaying).append("\n");
         msg.append("Receiving ECG: ").append(mEcgDisposable != null).append(
                 "\n");
-        if (mPlotter != null && mPlotter.getSeries() !=
-                null && mPlotter.getSeries().getyVals() != null) {
+        if (mPlotter != null && mPlotter.getmSeries() !=
+                null && mPlotter.getmSeries().getyVals() != null) {
             double elapsed =
-                    mPlotter.getDataIndex() / 130.;
+                    mPlotter.getmDataIndex() / 130.;
             msg.append("Elapsed Time: ")
                     .append(getString(R.string.elapsed_time, elapsed)).append("\n");
             msg.append("Points plotted: ")
-                    .append(mPlotter.getSeries().getyVals().size()).append(
+                    .append(mPlotter.getmSeries().getyVals().size()).append(
                     "\n");
         }
-        Single<PolarSensorSetting> ecgSettings =
-                mApi.requestEcgSettings(mDeviceId);
         msg.append("Polar BLE API Version: ").
                 append(PolarBleApiDefaultImpl.versionInfo()).append("\n");
         msg.append("Location Permission: ")
@@ -792,7 +788,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                                     if (mPlaying) {
                                         mPlotter.addValues(mPlot, polarEcgData);
                                         double elapsed =
-                                                mPlotter.getDataIndex() / 130.;
+                                                mPlotter.getmDataIndex() / 130.;
                                         mTextViewTime.setText(getString(R.string.elapsed_time, elapsed));
                                     }
                                 }
