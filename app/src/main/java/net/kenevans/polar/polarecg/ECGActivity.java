@@ -56,7 +56,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
-import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Action;
@@ -95,6 +94,10 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     private String mDeviceId = "";
     private String mFirmware;
     private String mBatteryLevel;
+    //* HR when stopped playing. Updated whenever playing started or stopped. */
+    private String mStopHR;
+    //* Date when stopped playing. Updated whenever playing started or stopped. */
+    private Date mStopTime;
 
 //    // Used in Logging
 //    private long ecgTime0;
@@ -110,6 +113,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         mTextViewTime = findViewById(R.id.time);
         mPlot = findViewById(R.id.plot);
         mSharedPreferences = getPreferences(MODE_PRIVATE);
+        mStopHR = mTextViewHR.getText().toString();
+        mStopTime = new Date();
 
         // Start Bluetooth
         checkBT();
@@ -208,6 +213,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             }
             if (mPlaying) {
                 // Turn it off
+                mStopHR = mTextViewHR.getText().toString();
+                mStopTime = new Date();
                 mPlaying = false;
                 allowPan(true);
                 if (mEcgDisposable != null) {
@@ -223,6 +230,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 mMenu.findItem(R.id.save_both).setVisible(true);
             } else {
                 // Turn it on
+                mStopHR = mTextViewHR.getText().toString();
+                mStopTime = new Date();
                 mPlaying = true;
                 allowPan(false);
                 mTextViewTime.setText(getString(R.string.elapsed_time,
@@ -587,8 +596,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         String msg;
         String format = "yyyy-MM-dd_HH-mm";
         SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
-        final Date now = new Date();
-        String fileName = "PolarECG-" + df.format(now) + ".png";
+        String fileName = "PolarECG-" + df.format(mStopTime) + ".png";
         try {
             Uri treeUri = Uri.parse(treeUriStr);
             String treeDocumentId =
@@ -608,12 +616,12 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                         mPlotter.getmSeries().getyVals();
                 final int nSamples = vals.size();
                 Bitmap bm = EcgImage.createImage(this,
-                        now.toString(),
+                        mStopTime.toString(),
                         mDeviceId,
                         mFirmware,
                         mBatteryLevel,
                         note,
-                        mTextViewHR.getText().toString(),
+                        mStopHR,
                         String.format(Locale.US, "%.1f " +
                                 "sec", nSamples / 130.),
                         vals);
@@ -646,8 +654,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         String msg;
         String format = "yyyy-MM-dd_HH-mm";
         SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
-        final Date now = new Date();
-        String fileName = "PolarECG-" + df.format(now) + ".csv";
+        String fileName = "PolarECG-" + df.format(mStopTime) + ".csv";
         try {
             Uri treeUri = Uri.parse(treeUriStr);
             String treeDocumentId =
@@ -664,11 +671,11 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             try (FileWriter writer = new FileWriter(pfd.getFileDescriptor());
                  PrintWriter out = new PrintWriter((writer))) {
                 // Write header
-                out.write(now.toString() + "\n");
+                out.write(mStopTime.toString() + "\n");
                 // The text for this TextView already has a \n
                 out.write(mTextViewFW.getText().toString());
                 out.write(note + "\n");
-                out.write("HR " + mTextViewHR.getText().toString() + "\n");
+                out.write("HR " + mStopHR + "\n");
                 // Write samples
                 LinkedList<Number> vals = mPlotter.getmSeries().getyVals();
                 int nSamples = vals.size();
@@ -962,11 +969,15 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         try {
             mApi.connectToDevice(mDeviceId);
             mPlaying = true;
+            mStopHR = mTextViewHR.getText().toString();
+            mStopTime = new Date();
         } catch (PolarInvalidArgument ex) {
             String msg = "connectToDevice: Bad argument: mDeviceId" + mDeviceId;
             Utils.excMsg(this, msg, ex);
             Log.d(TAG, "    restart: " + msg);
             mPlaying = false;
+            mStopHR = mTextViewHR.getText().toString();
+            mStopTime = new Date();
         }
         invalidateOptionsMenu();
         Log.d(TAG, "    restart(end) mApi=" + mApi + " mPlaying=" + mPlaying);
