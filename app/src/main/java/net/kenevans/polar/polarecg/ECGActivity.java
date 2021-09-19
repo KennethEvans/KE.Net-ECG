@@ -37,6 +37,14 @@ import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
+import com.polar.sdk.api.PolarBleApi;
+import com.polar.sdk.api.PolarBleApiCallback;
+import com.polar.sdk.api.PolarBleApiDefaultImpl;
+import com.polar.sdk.api.errors.PolarInvalidArgument;
+import com.polar.sdk.api.model.PolarDeviceInfo;
+import com.polar.sdk.api.model.PolarEcgData;
+import com.polar.sdk.api.model.PolarHrData;
+import com.polar.sdk.api.model.PolarSensorSetting;
 
 import org.reactivestreams.Publisher;
 
@@ -48,6 +56,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 import androidx.annotation.NonNull;
@@ -56,19 +65,11 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
-import io.reactivex.android.schedulers.AndroidSchedulers;
-import io.reactivex.disposables.Disposable;
-import io.reactivex.functions.Action;
-import io.reactivex.functions.Consumer;
-import io.reactivex.functions.Function;
-import polar.com.sdk.api.PolarBleApi;
-import polar.com.sdk.api.PolarBleApiCallback;
-import polar.com.sdk.api.PolarBleApiDefaultImpl;
-import polar.com.sdk.api.errors.PolarInvalidArgument;
-import polar.com.sdk.api.model.PolarDeviceInfo;
-import polar.com.sdk.api.model.PolarEcgData;
-import polar.com.sdk.api.model.PolarHrData;
-import polar.com.sdk.api.model.PolarSensorSetting;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.functions.Action;
+import io.reactivex.rxjava3.functions.Consumer;
+import io.reactivex.rxjava3.functions.Function;
 
 public class ECGActivity extends AppCompatActivity implements IConstants,
         PlotterListener {
@@ -91,12 +92,15 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     private Disposable mEcgDisposable;
     private boolean mPlaying;
     private Menu mMenu;
-    private String mDeviceId = "";
-    private String mFirmware;
-    private String mBatteryLevel;
+    private String mDeviceId = "Unknown";
+    private String mFirmware = "Unknown";
+    private String mName = "Unknown";
+    private String mAddress = "Unknown";
+    private String mBatteryLevel = "Unknown";
     //* HR when stopped playing. Updated whenever playing started or stopped. */
     private String mStopHR;
-    //* Date when stopped playing. Updated whenever playing started or stopped. */
+    //* Date when stopped playing. Updated whenever playing started or
+    // stopped. */
     private Date mStopTime;
 
 //    // Used in Logging
@@ -115,6 +119,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         mSharedPreferences = getPreferences(MODE_PRIVATE);
         mStopHR = mTextViewHR.getText().toString();
         mStopTime = new Date();
+
 
         // Start Bluetooth
         checkBT();
@@ -293,9 +298,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             editor.apply();
 
             // Persist access permissions.
-            final int takeFlags = intent.getFlags()
-                    & (Intent.FLAG_GRANT_READ_URI_PERMISSION |
-                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            final int takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
             if (treeUri != null) {
                 this.getContentResolver().takePersistableUriPermission(treeUri,
                         takeFlags);
@@ -350,6 +354,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[]
             permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions,
+                grantResults);
         Log.d(TAG, this.getClass().getSimpleName() + ": " +
                 "onRequestPermissionsResult:" + " permissions=" +
                 permissions[0]);
@@ -701,7 +707,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 
     public void info() {
         StringBuilder msg = new StringBuilder();
+        msg.append("Name: ").append(mName).append("\n");
         msg.append("Device Id: ").append(mDeviceId).append("\n");
+        msg.append("Address: ").append(mAddress).append("\n");
         msg.append("Firmware: ").append(mFirmware).append("\n");
         msg.append("Battery Level: ").append(mBatteryLevel).append("\n");
         msg.append("Connected: ").append((mApi != null)).append("\n");
@@ -743,7 +751,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 + "mEcgDisposable=" + mEcgDisposable);
         if (mEcgDisposable == null) {
             mEcgDisposable =
-                    mApi.requestEcgSettings(mDeviceId).
+                    mApi.requestStreamSettings(mDeviceId,
+                            PolarBleApi.DeviceStreamingFeature.ECG).
                             toFlowable().
                             flatMap(new Function<PolarSensorSetting,
                                     Publisher<PolarEcgData>>() {
@@ -914,6 +923,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             @Override
             public void deviceConnected(@NonNull PolarDeviceInfo s) {
                 Log.d(TAG, "*Device connected " + s.deviceId);
+                mAddress = s.address;
+                mName = s.name;
                 Toast.makeText(ECGActivity.this, R.string.connected,
                         Toast.LENGTH_SHORT).show();
             }
@@ -924,9 +935,23 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             }
 
             @Override
-            public void ecgFeatureReady(@NonNull String s) {
-                Log.d(TAG, "*ECG Feature ready " + s);
-                streamECG();
+            public void streamingFeaturesReady(@NonNull final String identifier,
+                                               @NonNull final Set<PolarBleApi.DeviceStreamingFeature> features) {
+                for (PolarBleApi.DeviceStreamingFeature feature : features) {
+                    Log.d(TAG, "Streaming feature is ready for 1: " + feature);
+                    switch (feature) {
+                        case ECG:
+                            streamECG();
+                            break;
+                        case PPI:
+                        case ACC:
+                        case MAGNETOMETER:
+                        case GYRO:
+                        case PPG:
+                        default:
+                            break;
+                    }
+                }
             }
 
             @Override

@@ -6,8 +6,7 @@ import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.XYPlot;
 import com.androidplot.xy.XYRegionFormatter;
 import com.androidplot.xy.XYSeriesFormatter;
-
-import polar.com.sdk.api.model.PolarEcgData;
+import com.polar.sdk.api.model.PolarEcgData;
 
 @SuppressWarnings("WeakerAccess")
 public class Plotter implements IConstants {
@@ -59,7 +58,8 @@ public class Plotter implements IConstants {
      */
     public void addValues(XYPlot plot, PolarEcgData polarEcgData) {
 //        Log.d(TAG,
-//                "addValues: dataIndex=" + dataIndex + " seriesSize=" + series.size());
+//                "addValues: dataIndex=" + dataIndex + " seriesSize=" +
+//                series.size());
         int nSamples = polarEcgData.samples.size();
         if (nSamples == 0) return;
 
