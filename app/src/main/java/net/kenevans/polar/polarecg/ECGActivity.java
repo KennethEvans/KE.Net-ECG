@@ -151,14 +151,11 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         // Setup the plot if not done
         Log.d(TAG, "    mPlotter=" + mPlotter);
         if (mPlotter == null) {
-            mPlot.post(new Runnable() {
-                @Override
-                public void run() {
-                    mPlotter = new Plotter(N_TOTAL_POINTS, N_PLOT_POINTS,
-                            "ECG", Color.RED, false);
-                    mPlotter.setmListener(ECGActivity.this);
-                    setupPlot();
-                }
+            mPlot.post(() -> {
+                mPlotter = new Plotter(N_TOTAL_POINTS, N_PLOT_POINTS,
+                        "ECG", Color.RED, false);
+                mPlotter.setmListener(ECGActivity.this);
+                setupPlot();
             });
         }
 
@@ -335,12 +332,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         }
         // Cannot do this now as the screen changes have only been dispatched
         mOrientationChanged = true;
-        mPlot.post(new Runnable() {
-            @Override
-            public void run() {
-                mPlot.redraw();
-            }
-        });
+        mPlot.post(() -> mPlot.redraw());
     }
 
 
@@ -429,17 +421,14 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                     }
                 });
         dialog.setNegativeButton(R.string.cancel,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        Log.d(TAG,
-                                "showDeviceIdDialog: Cancel:  mDeviceId=" + mDeviceId);
-                        dialog.cancel();
-                        if (mDeviceId == null || mDeviceId.isEmpty()) {
-                            Toast.makeText(ECGActivity.this,
-                                    getString(R.string.noDevice),
-                                    Toast.LENGTH_SHORT).show();
-                        }
+                (dialog1, which) -> {
+                    Log.d(TAG,
+                            "showDeviceIdDialog: Cancel:  mDeviceId=" + mDeviceId);
+                    dialog1.cancel();
+                    if (mDeviceId == null || mDeviceId.isEmpty()) {
+                        Toast.makeText(ECGActivity.this,
+                                getString(R.string.noDevice),
+                                Toast.LENGTH_SHORT).show();
                     }
                 });
         dialog.show();
@@ -561,28 +550,22 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         dialog.setView(viewInflated);
 
         dialog.setPositiveButton(R.string.ok,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        switch (saveType) {
-                            case DATA:
-                                doSaveData(input.getText().toString());
-                                break;
-                            case PLOT:
-                                doSavePlot(input.getText().toString());
-                                break;
-                            case BOTH:
-                                doSaveData(input.getText().toString());
-                                doSavePlot(input.getText().toString());
-                                break;
-                        }
+                (dialog1, which) -> {
+                    switch (saveType) {
+                        case DATA:
+                            doSaveData(input.getText().toString());
+                            break;
+                        case PLOT:
+                            doSavePlot(input.getText().toString());
+                            break;
+                        case BOTH:
+                            doSaveData(input.getText().toString());
+                            doSavePlot(input.getText().toString());
+                            break;
                     }
                 });
         dialog.setNegativeButton(R.string.cancel,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                    }
+                (dialog12, which) -> {
                 });
         dialog.show();
     }
@@ -754,32 +737,27 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                     mApi.requestStreamSettings(mDeviceId,
                             PolarBleApi.DeviceStreamingFeature.ECG).
                             toFlowable().
-                            flatMap(new Function<PolarSensorSetting,
-                                    Publisher<PolarEcgData>>() {
-                                @Override
-                                public Publisher<PolarEcgData> apply(@NonNull PolarSensorSetting sensorSetting) {
-//                            Log.d(TAG, "mEcgDisposable requestEcgSettings " +
-//                                    "apply");
-//                            Log.d(TAG,
-//                                    "sampleRate=" + sensorSetting
-//                                    .maxSettings().settings.
-//                                            get(PolarSensorSetting
-//                                            .SettingType.SAMPLE_RATE) +
-//                                            " resolution=" + sensorSetting
-//                                            .maxSettings().settings.
-//                                            get(PolarSensorSetting
-//                                            .SettingType.RESOLUTION) +
-//                                            " range=" + sensorSetting
-//                                            .maxSettings().settings.
-//                                            get(PolarSensorSetting
-//                                            .SettingType.RANGE));
-                                    return mApi.startEcgStreaming(mDeviceId,
-                                            sensorSetting.maxSettings());
-                                }
-                            }).observeOn(AndroidSchedulers.mainThread()).subscribe(
-                            new Consumer<PolarEcgData>() {
-                                @Override
-                                public void accept(PolarEcgData polarEcgData) {
+                            flatMap((Function<PolarSensorSetting,
+                                    Publisher<PolarEcgData>>) sensorSetting -> {
+    //                            Log.d(TAG, "mEcgDisposable requestEcgSettings " +
+    //                                    "apply");
+    //                            Log.d(TAG,
+    //                                    "sampleRate=" + sensorSetting
+    //                                    .maxSettings().settings.
+    //                                            get(PolarSensorSetting
+    //                                            .SettingType.SAMPLE_RATE) +
+    //                                            " resolution=" + sensorSetting
+    //                                            .maxSettings().settings.
+    //                                            get(PolarSensorSetting
+    //                                            .SettingType.RESOLUTION) +
+    //                                            " range=" + sensorSetting
+    //                                            .maxSettings().settings.
+    //                                            get(PolarSensorSetting
+    //                                            .SettingType.RANGE));
+                                        return mApi.startEcgStreaming(mDeviceId,
+                                                sensorSetting.maxSettings());
+                                    }).observeOn(AndroidSchedulers.mainThread()).subscribe(
+                            polarEcgData -> {
 //                                    double deltaT =
 //                                            .000000001 * (polarEcgData
 //                                            .timeStamp - ecgTime0);
@@ -801,28 +779,19 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 //                                            polarEcgData.timeStamp / 1000000;
 //                                    Log.d(TAG, "timeOffset=" + (now - ts) +
 //                                            " " + new Date(now - ts));
-                                    if (mPlaying) {
-                                        mPlotter.addValues(mPlot, polarEcgData);
-                                        double elapsed =
-                                                mPlotter.getmDataIndex() / 130.;
-                                        mTextViewTime.setText(getString(R.string.elapsed_time, elapsed));
-                                    }
+                                if (mPlaying) {
+                                    mPlotter.addValues(mPlot, polarEcgData);
+                                    double elapsed =
+                                            mPlotter.getmDataIndex() / 130.;
+                                    mTextViewTime.setText(getString(R.string.elapsed_time, elapsed));
                                 }
                             },
-                            new Consumer<Throwable>() {
-                                @Override
-                                public void accept(Throwable throwable) {
-                                    Log.e(TAG,
-                                            "" + throwable.getLocalizedMessage());
-                                    mEcgDisposable = null;
-                                }
+                            throwable -> {
+                                Log.e(TAG,
+                                        "ECG Error: " + throwable.getLocalizedMessage());
+                                mEcgDisposable = null;
                             },
-                            new Action() {
-                                @Override
-                                public void run() {
-                                    Log.d(TAG, "ECG streaming complete");
-                                }
-                            }
+                            () -> Log.d(TAG, "ECG streaming complete")
                     );
         } else {
             // NOTE stops streaming if it is "running"
@@ -833,13 +802,10 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 
     @Override
     public void update() {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
+        runOnUiThread(() -> {
 //                Log.d(TAG, "update (UI) thread: " + Thread.currentThread()
 //                .getName());
-                mPlot.redraw();
-            }
+            mPlot.redraw();
         });
     }
 
@@ -966,18 +932,18 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 if (u.equals(UUID.fromString("00002a28-0000-1000-8000" +
                         "-00805f9b34fb"))) {
                     mFirmware = s1.trim();
-                    String msg = "Firmware: " + mFirmware;
                     Log.d(TAG, "*Firmware: " + s + " " + mFirmware);
-                    mTextViewFW.append(msg + "\n");
+                    mTextViewFW.setText(getString(R.string.info_string,
+                            mName, mBatteryLevel, mFirmware, mDeviceId));
                 }
             }
 
             @Override
             public void batteryLevelReceived(@NonNull String s, int i) {
                 mBatteryLevel = Integer.toString(i);
-                String msg = "ID: " + s + "\nBattery level: " + i;
                 Log.d(TAG, "*Battery level " + s + " " + i);
-                mTextViewFW.append(msg + "\n");
+                mTextViewFW.setText(getString(R.string.info_string,
+                        mName, mBatteryLevel, mFirmware, mDeviceId));
             }
 
             @Override
