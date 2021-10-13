@@ -1,6 +1,7 @@
 package net.kenevans.polar.polarecg;
 
 import android.Manifest;
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.content.ContentResolver;
 import android.content.DialogInterface;
@@ -81,9 +82,12 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     SharedPreferences mSharedPreferences;
     private static final int MAX_DEVICES = 3;
     List<DeviceInfo> mMruDevices;
-    // The total number of points = 26 * total large blocks desired
-    private static final int N_TOTAL_POINTS = 3900;  // 150 = 30 sec
-    private static final int N_PLOT_POINTS = 520;    // 20 points
+    // The defaults are for 130 Hz
+    private int mSamplingRate = 130;
+    private int mNLarge = 26;
+    // The total number of points = nLarge * total large blocks desired
+    private int mNTotalPoints = 150 * mNLarge;  // 150 = 30 sec
+    private int mNPlotPoints = 20 * mNLarge;    // 20 points
     private XYPlot mPlot;
     private Plotter mPlotter;
     private PlotListener mPlotListener;
@@ -167,8 +171,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         Log.d(TAG, "    mPlotter=" + mPlotter);
         if (mPlotter == null) {
             mPlot.post(() -> {
-                mPlotter = new Plotter(N_TOTAL_POINTS, N_PLOT_POINTS,
-                        "ECG", Color.RED, false);
+                mPlotter =
+                        new Plotter(mNTotalPoints, mNPlotPoints,
+                                "ECG", Color.RED, false);
                 mPlotter.setmListener(ECGActivity.this);
                 setupPlot();
             });
@@ -563,12 +568,12 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 //                " height=" + (gridRect.bottom - gridRect.top));
 
         // Calculate the range limits to make the blocks be square
-        // Using .5 mV and N_PLOT_POINTS / 130 Hz for total grid size
+        // Using .5 mV and nLarge / samplingRate for total grid size
         // rMax is half the total, rMax at top and -rMax at bottom
         RectF gridRect = mPlot.getGraph().getGridRect();
         double rMax =
-                .25 * (gridRect.bottom - gridRect.top) * N_PLOT_POINTS /
-                        26 / (gridRect.right - gridRect.left);
+                .25 * (gridRect.bottom - gridRect.top) * mNPlotPoints /
+                        mNLarge / (gridRect.right - gridRect.left);
         // Round it to one decimal point
         rMax = Math.round(rMax * 10) / 10.;
         Log.d(TAG, "    rMax = " + rMax);
@@ -586,10 +591,11 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         // Set the range block to be .1 mV so a large block will be .5 mV
         mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .1);
         mPlot.setLinesPerRangeLabel(5);
-        mPlot.setDomainBoundaries(0, N_PLOT_POINTS, BoundaryMode.FIXED);
-        // Set the domain block to be .2 * 26 so large block will be 26 samples
+        mPlot.setDomainBoundaries(0, mNPlotPoints, BoundaryMode.FIXED);
+        // Set the domain block to be .2 * nlarge so large block will be
+        // nLarge samples
         mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
-                .2 * 26);
+                .2 * mNLarge);
         mPlot.setLinesPerDomainLabel(5);
 
         mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
@@ -608,9 +614,24 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         update();
     }
 
+    public void resetPlot(int samplingRate) {
+        mSamplingRate = samplingRate;
+        mNLarge = (int) Math.round(.2 * samplingRate);
+        mNTotalPoints = 150 * mNLarge;
+        mNPlotPoints = 20 * mNLarge;
+        mPlot.post(() -> {
+            mPlotter =
+                    new Plotter(mNTotalPoints, mNPlotPoints,
+                            "PPG", Color.RED, false);
+            mPlotter.setmListener(ECGActivity.this);
+            setupPlot();
+        });
+    }
+
     private void allowPan(boolean allow) {
         if (allow) {
-            PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
+            PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL,
+                    PanZoom.Zoom.NONE);
         } else {
             PanZoom.attach(mPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
         }
@@ -699,6 +720,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                         mPlotter.getmSeries().getyVals();
                 final int nSamples = vals.size();
                 Bitmap bm = EcgImage.createImage(this,
+                        mSamplingRate,
                         mStopTime.toString(),
                         mDeviceId,
                         mFirmware,
@@ -706,7 +728,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                         note,
                         mStopHR,
                         String.format(Locale.US, "%.1f " +
-                                "sec", nSamples / 130.),
+                                "sec", nSamples / (double) mSamplingRate),
                         vals);
                 bm.compress(Bitmap.CompressFormat.PNG, 80, strm);
                 strm.close();
@@ -762,9 +784,10 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 // Write samples
                 LinkedList<Number> vals = mPlotter.getmSeries().getyVals();
                 int nSamples = vals.size();
-                out.write(nSamples + " values " + String.format(Locale.US, "%" +
-                        ".1f " +
-                        "sec\n", nSamples / 130.));
+                out.write(nSamples + " values " + String.format(Locale.US
+                        , "%" +
+                                ".1f " +
+                                "sec\n", nSamples / (double) mSamplingRate));
                 for (Number val : vals) {
                     out.write(String.format(Locale.US, "%.3f\n",
                             val.doubleValue()));
@@ -796,7 +819,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         if (mPlotter != null && mPlotter.getmSeries() !=
                 null && mPlotter.getmSeries().getyVals() != null) {
             double elapsed =
-                    mPlotter.getmDataIndex() / 130.;
+                    mPlotter.getmDataIndex() / (double) mSamplingRate;
             msg.append("Elapsed Time: ")
                     .append(getString(R.string.elapsed_time, elapsed)).append("\n");
             msg.append("Points plotted: ")
