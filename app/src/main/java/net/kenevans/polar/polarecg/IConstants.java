@@ -4,6 +4,7 @@ public interface IConstants {
     String TAG = "KE.NetECG";
 
     String PREF_DEVICE_ID = "deviceId";
+    String PREF_MRU_DEVICE_IDS = "mruDeviceIds";
     String PREF_TREE_URI = "treeUri";
 
     int REQ_ACCESS_LOCATION = 1;

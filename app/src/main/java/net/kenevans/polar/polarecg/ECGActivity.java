@@ -37,6 +37,8 @@ import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.polar.sdk.api.PolarBleApi;
 import com.polar.sdk.api.PolarBleApiCallback;
 import com.polar.sdk.api.PolarBleApiDefaultImpl;
@@ -52,9 +54,12 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -74,6 +79,8 @@ import io.reactivex.rxjava3.functions.Function;
 public class ECGActivity extends AppCompatActivity implements IConstants,
         PlotterListener {
     SharedPreferences mSharedPreferences;
+    private static final int MAX_DEVICES = 3;
+    List<DeviceInfo> mMruDevices;
     // The total number of points = 26 * total large blocks desired
     private static final int N_TOTAL_POINTS = 3900;  // 150 = 30 sec
     private static final int N_PLOT_POINTS = 520;    // 20 points
@@ -125,9 +132,17 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         checkBT();
         mDeviceId = mSharedPreferences.getString(PREF_DEVICE_ID, "");
         Log.d(TAG, "    mDeviceId=" + mDeviceId);
+        Gson gson = new Gson();
+        Type type = new TypeToken<LinkedList<DeviceInfo>>() {
+        }.getType();
+        String json = mSharedPreferences.getString(PREF_MRU_DEVICE_IDS, null);
+        mMruDevices = gson.fromJson(json, type);
+        if (mMruDevices == null) {
+            mMruDevices = new ArrayList<>();
+        }
 
         if (mDeviceId == null || mDeviceId.equals("")) {
-            showDeviceIdDialog(null);
+            selectDeviceId();
         }
     }
 
@@ -266,7 +281,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             info();
             return true;
         } else if (id == R.id.device_id) {
-            showDeviceIdDialog(null);
+            selectDeviceId();
             return true;
         } else if (id == R.id.choose_data_directory) {
             chooseDataDirectory();
@@ -360,10 +375,70 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 //        }
     }
 
+    public void selectDeviceId() {
+        if (mMruDevices.size() == 0) {
+            showDeviceIdDialog(null);
+            return;
+        }
+        final AlertDialog.Builder[] dialog =
+                {new AlertDialog.Builder(ECGActivity.this, R.style.PolarTheme)};
+        dialog[0].setTitle(R.string.device_id_item);
+        String[] items = new String[mMruDevices.size() + 1];
+        DeviceInfo deviceInfo;
+        for (int i = 0; i < mMruDevices.size(); i++) {
+            deviceInfo = mMruDevices.get(i);
+            items[i] = deviceInfo.name;
+        }
+        items[mMruDevices.size()] = "New";
+        int checkedItem = 0;
+        dialog[0].setSingleChoiceItems(items, checkedItem,
+                new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (which < mMruDevices.size()) {
+                            DeviceInfo deviceInfo = mMruDevices.get(which);
+                            String oldDeviceId = mDeviceId;
+                            setDeviceMruPref(deviceInfo);
+                            Log.d(TAG, "which=" + which
+                                    + " name=" + deviceInfo.name + " id=" + deviceInfo.id);
+                            Log.d(TAG,
+                                    "selectDeviceId: oldDeviceId=" + oldDeviceId
+                                            + " mDeviceId=" + mDeviceId);
+                            if (!oldDeviceId.equals(mDeviceId)) {
+                                if (mApi != null) {
+                                    try {
+                                        mApi.disconnectFromDevice(oldDeviceId);
+                                    } catch (PolarInvalidArgument ex) {
+                                        String msg = "disconnectFromDevice: " +
+                                                "Bad " +
+                                                "argument: mDeviceId"
+                                                + mDeviceId;
+                                        Utils.excMsg(ECGActivity.this, msg, ex);
+                                        Log.d(TAG,
+                                                this.getClass().getSimpleName()
+                                                        + " showDeviceIdDialog: " + msg);
+                                    }
+                                    mApi = null;
+                                }
+                                restart();
+                            }
+                        } else {
+                            showDeviceIdDialog(null);
+                        }
+                        dialog.dismiss();
+                    }
+                });
+        dialog[0].setNegativeButton(R.string.cancel,
+                (dialog1, which) -> dialog1.dismiss());
+        AlertDialog alert = dialog[0].create();
+        alert.setCanceledOnTouchOutside(false);
+        alert.show();
+    }
+
     public void showDeviceIdDialog(View view) {
         AlertDialog.Builder dialog = new AlertDialog.Builder(this,
                 R.style.PolarTheme);
-        dialog.setTitle(R.string.device_id_dialog_title);
+        dialog.setTitle(R.string.device_id_item);
 
         View viewInflated = LayoutInflater.from(getApplicationContext()).
                 inflate(R.layout.device_id_dialog_layout,
@@ -389,14 +464,14 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                                 mSharedPreferences.edit();
                         editor.putString(PREF_DEVICE_ID, mDeviceId);
                         editor.apply();
-                        if (!oldDeviceId.equals(mDeviceId)) {
-                            if (mEcgDisposable != null) {
-                                // Turns it off
-                                streamECG();
-                            }
+                        if (mDeviceId == null || mDeviceId.isEmpty()) {
+                            Toast.makeText(ECGActivity.this,
+                                    getString(R.string.noDevice),
+                                    Toast.LENGTH_SHORT).show();
+                        } else if (!oldDeviceId.equals(mDeviceId)) {
                             if (mApi != null) {
                                 try {
-                                    mApi.disconnectFromDevice(mDeviceId);
+                                    mApi.disconnectFromDevice(oldDeviceId);
                                 } catch (PolarInvalidArgument ex) {
                                     String msg = "disconnectFromDevice: Bad " +
                                             "argument: mDeviceId"
@@ -407,16 +482,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                                 }
                                 mApi = null;
                             }
-                            mPlaying = false;
-                            mPlotter.clear();
-                            mTextViewFW.setText("");
-                            invalidateOptionsMenu();
                             restart();
-                        }
-                        if (mDeviceId == null || mDeviceId.isEmpty()) {
-                            Toast.makeText(ECGActivity.this,
-                                    getString(R.string.noDevice),
-                                    Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
@@ -432,6 +498,34 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                     }
                 });
         dialog.show();
+    }
+
+    public void setDeviceMruPref(DeviceInfo deviceInfo) {
+        SharedPreferences.Editor editor =
+                mSharedPreferences.edit();
+        // Remove any found so the new one will be added at the beginning
+        List<DeviceInfo> removeList = new ArrayList<>();
+        for (DeviceInfo deviceInfo1 : mMruDevices) {
+            if (deviceInfo.name.equals(deviceInfo1.name) &&
+                    deviceInfo.id.equals(deviceInfo1.id)) {
+                removeList.add(deviceInfo1);
+            }
+        }
+        for (DeviceInfo deviceInfo1 : removeList) {
+            mMruDevices.remove(deviceInfo1);
+        }
+        // Remove at end if size exceed max
+        if (mMruDevices.size() != 0 && mMruDevices.size() == MAX_DEVICES) {
+            mMruDevices.remove(mMruDevices.size() - 1);
+        }
+        // Add at the beginning
+        mMruDevices.add(0, deviceInfo);
+        Gson gson = new Gson();
+        String json = gson.toJson(mMruDevices);
+        editor.putString(PREF_MRU_DEVICE_IDS, json);
+        mDeviceId = deviceInfo.id;
+        editor.putString(PREF_DEVICE_ID, deviceInfo.id);
+        editor.apply();
     }
 
     /**
@@ -845,6 +939,16 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         if (mApi != null || mDeviceId == null || mDeviceId.isEmpty()) {
             return;
         }
+        if (mEcgDisposable != null) {
+            // Turns it off
+            streamECG();
+        }
+        mPlaying = false;
+        if (mPlotter != null) mPlotter.clear();
+        mTextViewHR.setText("");
+        mTextViewTime.setText("");
+        mTextViewFW.setText("");
+        invalidateOptionsMenu();
         Toast.makeText(this,
                 getString(R.string.connecting) + " " + mDeviceId,
                 Toast.LENGTH_SHORT).show();
@@ -891,6 +995,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 Log.d(TAG, "*Device connected " + s.deviceId);
                 mAddress = s.address;
                 mName = s.name;
+                // Set the MRU preference here after we know the name
+                setDeviceMruPref(new DeviceInfo(mName, mDeviceId));
                 Toast.makeText(ECGActivity.this, R.string.connected,
                         Toast.LENGTH_SHORT).show();
             }
@@ -972,5 +1078,15 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         }
         invalidateOptionsMenu();
         Log.d(TAG, "    restart(end) mApi=" + mApi + " mPlaying=" + mPlaying);
+    }
+
+    public class DeviceInfo {
+        public String name;
+        public String id;
+
+        public DeviceInfo(String name, String id) {
+            this.name = name;
+            this.id = id;
+        }
     }
 }
