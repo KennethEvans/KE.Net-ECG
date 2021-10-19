@@ -10,7 +10,6 @@
     <string name="connect2">CONNECT HR/RR</string>
     <string name="connecting">Connecting to device</string>
     <string name="noDevice">There is no device defined</string>
-    <string name="connected">Connected</string>
     <string name="device_id">device_id</string>
     <string name="set_id_button">Change device ID</string>
     <string name="elapsed_time">%1$.1f sec"</string>
@@ -24,6 +23,7 @@
     <string name="info_item">Info</string>
     <string name="device_id_item">Set Device ID</string>
     <string name="info_string">%1$s\nBattery level: %2$s\nFirmware: %3$s\nID: %4$s\n</string>
+    <string name="connected_string">Connected to %1$s</string>
 
     <!-- Utils -->
     <string name="ok">OK</string>

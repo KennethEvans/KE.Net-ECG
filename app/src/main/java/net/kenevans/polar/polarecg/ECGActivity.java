@@ -1020,7 +1020,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 mName = s.name;
                 // Set the MRU preference here after we know the name
                 setDeviceMruPref(new DeviceInfo(mName, mDeviceId));
-                Toast.makeText(ECGActivity.this, R.string.connected,
+                Toast.makeText(ECGActivity.this,
+                        getString(R.string.connected_string, s.name),
                         Toast.LENGTH_SHORT).show();
             }
 
