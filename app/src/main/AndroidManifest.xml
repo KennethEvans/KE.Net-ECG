@@ -8,6 +8,7 @@
 
     <application
         android:allowBackup="true"
+        android:fullBackupOnly="true"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_polar_ecg"
         android:roundIcon="@mipmap/ic_polar_ecg_round"
@@ -16,7 +17,8 @@
         <activity
             android:name="net.kenevans.polar.polarecg.ECGActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
-            >
+            android:exported="true"
+        >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
 

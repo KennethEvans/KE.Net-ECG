@@ -1,7 +1,6 @@
 package net.kenevans.polar.polarecg;
 
 import android.Manifest;
-import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.content.ContentResolver;
 import android.content.DialogInterface;
@@ -65,6 +64,8 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -73,8 +74,6 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.disposables.Disposable;
-import io.reactivex.rxjava3.functions.Action;
-import io.reactivex.rxjava3.functions.Consumer;
 import io.reactivex.rxjava3.functions.Function;
 
 public class ECGActivity extends AppCompatActivity implements IConstants,
@@ -114,6 +113,66 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     // stopped. */
     private Date mStopTime;
 
+    private ActivityResultLauncher<Intent> enableBluetoothLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        Log.d(TAG, "enableBluetoothLauncher: result" +
+                                ".getResultCode()=" + result.getResultCode());
+                        if (result.getResultCode() != RESULT_OK) {
+                            Utils.warnMsg(this, "This app will not work with " +
+                                    "Bluetooth disabled");
+                        }
+                    });
+
+    private ActivityResultLauncher<Intent> openDocumentTreeLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        Log.d(TAG, "openDocumentTreeLauncher: result" +
+                                ".getResultCode()=" + result.getResultCode());
+                        PackageManager packageManager = getPackageManager();
+                        // Find the UID for this application
+                        Log.d(TAG, "URI=" + UriUtils.getApplicationUid(this));
+                        Log.d(TAG,
+                                "Current permissions (initial): "
+                                        + UriUtils.getNPersistedPermissions(this));
+                        if (result.getResultCode() == RESULT_OK) {
+                            // Get Uri from Storage Access Framework.
+                            Uri treeUri = result.getData().getData();
+                            SharedPreferences.Editor editor =
+                                    getPreferences(MODE_PRIVATE)
+                                            .edit();
+                            if (treeUri == null) {
+                                editor.putString(PREF_TREE_URI, null);
+                                editor.apply();
+                                Utils.errMsg(this, "Failed to get persistent " +
+                                        "access permissions");
+                                return;
+                            }
+                            // Persist access permissions.
+                            try {
+                                this.getContentResolver().takePersistableUriPermission(treeUri,
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                                // Save the current treeUri as PREF_TREE_URI
+                                editor.putString(PREF_TREE_URI,
+                                        treeUri.toString());
+                                editor.apply();
+                                // Trim the persisted permissions
+                                UriUtils.trimPermissions(this, 1);
+                            } catch (Exception ex) {
+                                String msg = "Failed to " +
+                                        "takePersistableUriPermission for "
+                                        + treeUri.getPath();
+                                Utils.excMsg(this, msg, ex);
+                            }
+                            Log.d(TAG,
+                                    "Current permissions (final): "
+                                            + UriUtils.getNPersistedPermissions(this));
+                        }
+                    });
+
 //    // Used in Logging
 //    private long ecgTime0;
 //    private long redrawTime0;
@@ -133,9 +192,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 
 
         // Start Bluetooth
-        checkBT();
         mDeviceId = mSharedPreferences.getString(PREF_DEVICE_ID, "");
         Log.d(TAG, "    mDeviceId=" + mDeviceId);
+        checkBT();
         Gson gson = new Gson();
         Type type = new TypeToken<LinkedList<DeviceInfo>>() {
         }.getType();
@@ -206,6 +265,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             mMenu.findItem(R.id.save_data).setVisible(false);
             mMenu.findItem(R.id.save_plot).setVisible(false);
             mMenu.findItem(R.id.save_both).setVisible(false);
+            mMenu.findItem(R.id.save_both).setVisible(true);
+            mMenu.findItem(R.id.device_id).setVisible(true);
         } else if (mPlaying) {
             mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
                     getDrawable(getResources(),
@@ -293,38 +354,6 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             return true;
         }
         return false;
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode,
-                                    Intent intent) {
-        super.onActivityResult(requestCode, resultCode, intent);
-        if (requestCode == REQ_GET_TREE && resultCode == RESULT_OK) {
-            Uri treeUri;
-            // Get Uri from Storage Access Framework.
-            treeUri = intent.getData();
-            // Keep them from accumulating
-            UriUtils.releaseAllPermissions(this);
-            SharedPreferences.Editor editor = getPreferences(MODE_PRIVATE)
-                    .edit();
-            if (treeUri != null) {
-                editor.putString(PREF_TREE_URI, treeUri.toString());
-            } else {
-                editor.putString(PREF_TREE_URI, null);
-            }
-            editor.apply();
-
-            // Persist access permissions.
-            final int takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION |
-                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
-            if (treeUri != null) {
-                this.getContentResolver().takePersistableUriPermission(treeUri,
-                        takeFlags);
-            } else {
-                Utils.errMsg(this, "Failed to get persistent access " +
-                        "permissions");
-            }
-        }
     }
 
     /**
@@ -856,24 +885,26 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                             toFlowable().
                             flatMap((Function<PolarSensorSetting,
                                     Publisher<PolarEcgData>>) sensorSetting -> {
-    //                            Log.d(TAG, "mEcgDisposable requestEcgSettings " +
-    //                                    "apply");
-    //                            Log.d(TAG,
-    //                                    "sampleRate=" + sensorSetting
-    //                                    .maxSettings().settings.
-    //                                            get(PolarSensorSetting
-    //                                            .SettingType.SAMPLE_RATE) +
-    //                                            " resolution=" + sensorSetting
-    //                                            .maxSettings().settings.
-    //                                            get(PolarSensorSetting
-    //                                            .SettingType.RESOLUTION) +
-    //                                            " range=" + sensorSetting
-    //                                            .maxSettings().settings.
-    //                                            get(PolarSensorSetting
-    //                                            .SettingType.RANGE));
-                                        return mApi.startEcgStreaming(mDeviceId,
-                                                sensorSetting.maxSettings());
-                                    }).observeOn(AndroidSchedulers.mainThread()).subscribe(
+                                //                            Log.d(TAG,
+                                //                            "mEcgDisposable
+                                //                            requestEcgSettings " +
+                                //                                    "apply");
+                                //                            Log.d(TAG,
+                                //                                    "sampleRate=" + sensorSetting
+                                //                                    .maxSettings().settings.
+                                //                                            get(PolarSensorSetting
+                                //                                            .SettingType.SAMPLE_RATE) +
+                                //                                            " resolution=" + sensorSetting
+                                //                                            .maxSettings().settings.
+                                //                                            get(PolarSensorSetting
+                                //                                            .SettingType.RESOLUTION) +
+                                //                                            " range=" + sensorSetting
+                                //                                            .maxSettings().settings.
+                                //                                            get(PolarSensorSetting
+                                //                                            .SettingType.RANGE));
+                                return mApi.startEcgStreaming(mDeviceId,
+                                        sensorSetting.maxSettings());
+                            }).observeOn(AndroidSchedulers.mainThread()).subscribe(
                             polarEcgData -> {
 //                                    double deltaT =
 //                                            .000000001 * (polarEcgData
@@ -927,12 +958,14 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     }
 
     public void checkBT() {
+        Log.d(TAG, "checkBT");
         BluetoothAdapter mBluetoothAdapter =
                 BluetoothAdapter.getDefaultAdapter();
         if (mBluetoothAdapter != null && !mBluetoothAdapter.isEnabled()) {
             Intent enableBtIntent =
                     new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(enableBtIntent, 2);
+//            startActivityForResult(enableBtIntent, REQ_ENABLE_BLUETOOTH);
+            enableBluetoothLauncher.launch(enableBtIntent);
         }
 
         //requestPermissions() method needs to be called when the build SDK
@@ -952,7 +985,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION &
                 Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
 //        intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, uriToLoad);
-        startActivityForResult(intent, REQ_GET_TREE);
+//        // Deprecated
+//        startActivityForResult(intent, REQ_GET_TREE);
+        openDocumentTreeLauncher.launch(intent);
     }
 
     public void restart() {

@@ -22,17 +22,17 @@
         app:showAsAction="never"
         />
     <item
-        android:id="@+id/info"
-        android:title="@string/info_item"
-        app:showAsAction="never"
-        />
-    <item
         android:id="@+id/device_id"
         android:title="@string/device_id_item"
         app:showAsAction="never"
         />
     <item android:id="@+id/choose_data_directory"
         android:title="@string/choose_data_directory_item"
+        app:showAsAction="never"
+        />
+    <item
+        android:id="@+id/info"
+        android:title="@string/info_item"
         app:showAsAction="never"
         />
 </menu>
