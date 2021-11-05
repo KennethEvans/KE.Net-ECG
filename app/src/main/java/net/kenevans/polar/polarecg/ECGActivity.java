@@ -2,7 +2,9 @@ package net.kenevans.polar.polarecg;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -113,7 +115,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     // stopped. */
     private Date mStopTime;
 
-    private ActivityResultLauncher<Intent> enableBluetoothLauncher =
+    private final ActivityResultLauncher<Intent> enableBluetoothLauncher =
             registerForActivityResult(
                     new ActivityResultContracts.StartActivityForResult(),
                     result -> {
@@ -125,13 +127,12 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                         }
                     });
 
-    private ActivityResultLauncher<Intent> openDocumentTreeLauncher =
+    private final ActivityResultLauncher<Intent> openDocumentTreeLauncher =
             registerForActivityResult(
                     new ActivityResultContracts.StartActivityForResult(),
                     result -> {
                         Log.d(TAG, "openDocumentTreeLauncher: result" +
                                 ".getResultCode()=" + result.getResultCode());
-                        PackageManager packageManager = getPackageManager();
                         // Find the UID for this application
                         Log.d(TAG, "URI=" + UriUtils.getApplicationUid(this));
                         Log.d(TAG,
@@ -959,13 +960,15 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 
     public void checkBT() {
         Log.d(TAG, "checkBT");
-        BluetoothAdapter mBluetoothAdapter =
-                BluetoothAdapter.getDefaultAdapter();
-        if (mBluetoothAdapter != null && !mBluetoothAdapter.isEnabled()) {
-            Intent enableBtIntent =
-                    new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-//            startActivityForResult(enableBtIntent, REQ_ENABLE_BLUETOOTH);
-            enableBluetoothLauncher.launch(enableBtIntent);
+        BluetoothManager bluetoothManager =
+                (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        if (bluetoothManager != null) {
+            BluetoothAdapter mBluetoothAdapter = bluetoothManager.getAdapter();
+            if (mBluetoothAdapter != null && !mBluetoothAdapter.isEnabled()) {
+                Intent enableBtIntent =
+                        new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                enableBluetoothLauncher.launch(enableBtIntent);
+            }
         }
 
         //requestPermissions() method needs to be called when the build SDK
