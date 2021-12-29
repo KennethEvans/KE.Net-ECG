@@ -6,8 +6,8 @@ android {
         applicationId "net.kenevans.polar.polarecg"
         minSdkVersion 21
         targetSdkVersion 31
-        versionCode 9
-        versionName "1.6.2"
+        versionCode 10
+        versionName "2.0.0"
     }
 
     buildTypes {

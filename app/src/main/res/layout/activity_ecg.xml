@@ -1,78 +1,114 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/top"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <com.androidplot.xy.XYPlot
-        android:id="@+id/plot"
-        style="@style/FullScreenGraph"
-        android:layout_width="fill_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="10dp"
-        app:graphBackgroundColor="@color/colorAccent"
-        app:graphMarginBottom="10dp"
-        app:graphMarginLeft="10dp"
-        app:graphMarginRight="10dp"
-        app:graphMarginTop="10dp"
-        app:gridBackgroundColor="@color/colorAccent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/ecg"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/rr"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="1.0"
-        app:lineLabelInsetLeft="15dp"
-        app:lineLabels="left"
-        app:renderMode="use_background_thread"
-        app:title="@string/plot_title"
-        app:titleTextColor="#000000"
-        app:titleTextSize="15dp"
-        />
+        app:layout_constraintVertical_chainStyle="spread"
+        app:layout_constraintVertical_weight="0.7">
 
-    <TextView
-        android:id="@+id/info"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="30dp"
-        android:layout_marginTop="30dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="8dp"
-        android:textAlignment="center"
-        android:textColor="#C00000"
-        android:textSize="30sp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        />
+        <com.androidplot.xy.XYPlot
+            android:id="@+id/plot"
+            style="@style/FullScreenGraph"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="10dp"
 
-    <TextView
-        android:id="@+id/time"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="30dp"
-        android:layout_marginTop="30dp"
-        android:layout_marginEnd="30dp"
-        android:layout_marginBottom="8dp"
-        android:textAlignment="center"
-        android:textColor="#000000"
-        android:textSize="14sp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="@id/info"
-        app:layout_constraintEnd_toEndOf="parent"
-        />
+            app:graphBackgroundColor="@color/colorAccent"
+            app:graphMarginBottom="10dp"
+            app:graphMarginLeft="10dp"
+            app:graphMarginRight="10dp"
+            app:graphMarginTop="10dp"
+            app:gridBackgroundColor="@color/colorAccent"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
 
-    <TextView
-        android:id="@+id/fw"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="8dp"
-        android:textColor="#000000"
-        android:textSize="14sp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="1.0"
+            app:lineLabelInsetLeft="15dp"
+            app:lineLabels="left"
+            app:renderMode="use_background_thread"
+            app:title="@string/plot_title"
+            app:titleTextColor="#000000"
+            app:titleTextSize="15dp" />
+
+        <TextView
+            android:id="@+id/info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="30dp"
+            android:layout_marginTop="30dp"
+            android:textAlignment="center"
+            android:textColor="#C00000"
+            android:textSize="30sp"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="30dp"
+            android:layout_marginTop="30dp"
+            android:layout_marginRight="30dp"
+            android:layout_marginBottom="8dp"
+            android:textAlignment="center"
+            android:textColor="#000000"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toBottomOf="@id/info"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/fw"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="8dp"
+            android:layout_marginRight="8dp"
+            android:layout_marginBottom="8dp"
+            android:textColor="#000000"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintRight_toRightOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/rr"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        />
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ecg"
+        app:layout_constraintVertical_chainStyle="spread"
+        app:layout_constraintVertical_weight="0.3">
+
+        <!--        <TextView
+                    android:visibility="visible"
+                    android:background="#000000"
+                    android:id="@+id/test"
+                    android:layout_width="300dp"
+                    android:layout_height="300dp"
+                    android:layout_marginLeft="8dp"
+                    android:layout_marginRight="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:textColor="#000000"
+                    android:textSize="14sp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintRight_toRightOf="parent" />
+        -->
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

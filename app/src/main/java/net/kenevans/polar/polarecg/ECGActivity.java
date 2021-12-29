@@ -13,7 +13,6 @@ import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -21,7 +20,6 @@ import android.os.Environment;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.text.InputType;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -34,10 +32,7 @@ import android.widget.Toast;
 
 import com.androidplot.Plot;
 import com.androidplot.PlotListener;
-import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.PanZoom;
-import com.androidplot.xy.StepMode;
-import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -78,17 +73,12 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.functions.Function;
 
-public class ECGActivity extends AppCompatActivity implements IConstants,
-        PlotterListener {
+public class ECGActivity extends AppCompatActivity implements IConstants {
     SharedPreferences mSharedPreferences;
     private static final int MAX_DEVICES = 3;
+    // Currently the sampling rate is fixed at 130
+    private static final int mSamplingRate = 130;
     List<DeviceInfo> mMruDevices;
-    // The defaults are for 130 Hz
-    private int mSamplingRate = 130;
-    private int mNLarge = 26;
-    // The total number of points = nLarge * total large blocks desired
-    private int mNTotalPoints = 150 * mNLarge;  // 150 = 30 sec
-    private int mNPlotPoints = 20 * mNLarge;    // 20 points
     private XYPlot mPlot;
     private Plotter mPlotter;
     private PlotListener mPlotListener;
@@ -230,13 +220,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         // Setup the plot if not done
         Log.d(TAG, "    mPlotter=" + mPlotter);
         if (mPlotter == null) {
-            mPlot.post(() -> {
-                mPlotter =
-                        new Plotter(mNTotalPoints, mNPlotPoints,
-                                "ECG", Color.RED, false);
-                mPlotter.setmListener(ECGActivity.this);
-                setupPlot();
-            });
+            mPlot.post(() -> mPlotter =
+                    new Plotter(this, mPlot,
+                            "ECG", Color.RED, false));
         }
 
         // Start the connection to the device
@@ -563,100 +549,17 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         editor.apply();
     }
 
-    /**
-     * Sets the plot parameters, calculating the range boundaries to have the
-     * same grid as the domain.  Calls update when done.
-     */
-    public void setupPlot() {
-        Log.d(TAG, this.getClass().getSimpleName() + " setupPlot");
-//        DisplayMetrics displayMetrics = this.getResources()
-//        .getDisplayMetrics();
-//        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
-//        float dpWidth = displayMetrics.widthPixels / displayMetrics.density;
-//        Log.d(TAG, "dpWidth=" + dpWidth + " dpHeight=" + dpHeight);
-//        Log.d(TAG, "widthPixels=" + displayMetrics.widthPixels +
-//                " heightPixels=" + displayMetrics.heightPixels);
-//        Log.d(TAG, "density=" + displayMetrics.density);
-//        Log.d(TAG, "10dp=" + 10 / displayMetrics.density + " pixels");
-//
-//        Log.d(TAG, "plotWidth=" + mPlot.getWidth() +
-//                " plotHeight=" + mPlot.getHeight());
-//
-//        RectF widgetRect = mPlot.getGraph().getWidgetDimensions().canvasRect;
-//        Log.d(TAG,
-//                "widgetRect LRTB=" + widgetRect.left + "," + widgetRect
-//                .right +
-//                        "," + widgetRect.top + "," + widgetRect.bottom);
-//        Log.d(TAG, "widgetRect width=" + (widgetRect.right - widgetRect
-//        .left) +
-//                " height=" + (widgetRect.bottom - widgetRect.top));
-//
-//        RectF gridRect = mPlot.getGraph().getGridRect();
-//        Log.d(TAG, "gridRect LRTB=" + gridRect.left + "," + gridRect.right +
-//                "," + gridRect.top + "," + gridRect.bottom);
-//        Log.d(TAG, "gridRect width=" + (gridRect.right - gridRect.left) +
-//                " height=" + (gridRect.bottom - gridRect.top));
-
-        // Calculate the range limits to make the blocks be square
-        // Using .5 mV and nLarge / samplingRate for total grid size
-        // rMax is half the total, rMax at top and -rMax at bottom
-        RectF gridRect = mPlot.getGraph().getGridRect();
-        double rMax =
-                .25 * (gridRect.bottom - gridRect.top) * mNPlotPoints /
-                        mNLarge / (gridRect.right - gridRect.left);
-        // Round it to one decimal point
-        rMax = Math.round(rMax * 10) / 10.;
-        Log.d(TAG, "    rMax = " + rMax);
-        Log.d(TAG, "    gridRect LRTB=" + gridRect.left + "," + gridRect.right +
-                "," + gridRect.top + "," + gridRect.bottom);
-        Log.d(TAG, "    gridRect width=" + (gridRect.right - gridRect.left) +
-                " height=" + (gridRect.bottom - gridRect.top));
-        DisplayMetrics displayMetrics = this.getResources()
-                .getDisplayMetrics();
-        Log.d(TAG, "    display widthPixels=" + displayMetrics.widthPixels +
-                " heightPixels=" + displayMetrics.heightPixels);
-
-        mPlot.addSeries(mPlotter.getmSeries(), mPlotter.getmFormatter());
-        mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
-        // Set the range block to be .1 mV so a large block will be .5 mV
-        mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .1);
-        mPlot.setLinesPerRangeLabel(5);
-        mPlot.setDomainBoundaries(0, mNPlotPoints, BoundaryMode.FIXED);
-        // Set the domain block to be .2 * nlarge so large block will be
-        // nLarge samples
-        mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
-                .2 * mNLarge);
-        mPlot.setLinesPerDomainLabel(5);
-
-        mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
-
-        // These don't work
-//        mPlot.getTitle().position(0, HorizontalPositioning
-//        .ABSOLUTE_FROM_RIGHT,
-//                0,    VerticalPositioning.ABSOLUTE_FROM_TOP, Anchor
-//                .RIGHT_TOP);
-//        mPlot.getTitle().setAnchor(Anchor.BOTTOM_MIDDLE);
-//        mPlot.getTitle().setMarginTop(200);
-//        mPlot.getTitle().setPaddingTop(200);
-
-//        mPlot.setRenderMode(Plot.RenderMode.USE_BACKGROUND_THREAD);
-
-        update();
-    }
-
-    public void resetPlot(int samplingRate) {
-        mSamplingRate = samplingRate;
-        mNLarge = (int) Math.round(.2 * samplingRate);
-        mNTotalPoints = 150 * mNLarge;
-        mNPlotPoints = 20 * mNLarge;
-        mPlot.post(() -> {
-            mPlotter =
-                    new Plotter(mNTotalPoints, mNPlotPoints,
-                            "PPG", Color.RED, false);
-            mPlotter.setmListener(ECGActivity.this);
-            setupPlot();
-        });
-    }
+//    public void resetPlot(int samplingRate) {
+//        mSamplingRate = samplingRate;
+//        mNLarge = (int) Math.round(.2 * samplingRate);
+//        mNTotalPoints = 150 * mNLarge;
+//        mNPlotPoints = 20 * mNLarge;
+//        mPlot.post(() -> {
+//            mPlotter =
+//                    new Plotter(this, mPlot,
+//                            "PPG", Color.RED, false);
+//        });
+//    }
 
     private void allowPan(boolean allow) {
         if (allow) {
@@ -747,7 +650,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             try (FileOutputStream strm =
                          new FileOutputStream(pfd.getFileDescriptor())) {
                 final LinkedList<Number> vals =
-                        mPlotter.getmSeries().getyVals();
+                        mPlotter.getSeries().getyVals();
                 final int nSamples = vals.size();
                 Bitmap bm = EcgImage.createImage(this,
                         mSamplingRate,
@@ -812,7 +715,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 out.write(note + "\n");
                 out.write("HR " + mStopHR + "\n");
                 // Write samples
-                LinkedList<Number> vals = mPlotter.getmSeries().getyVals();
+                LinkedList<Number> vals = mPlotter.getSeries().getyVals();
                 int nSamples = vals.size();
                 out.write(nSamples + " values " + String.format(Locale.US
                         , "%" +
@@ -846,16 +749,26 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         msg.append("Playing: ").append(mPlaying).append("\n");
         msg.append("Receiving ECG: ").append(mEcgDisposable != null).append(
                 "\n");
-        if (mPlotter != null && mPlotter.getmSeries() !=
-                null && mPlotter.getmSeries().getyVals() != null) {
+        if (mPlotter != null && mPlotter.getSeries() !=
+                null && mPlotter.getSeries().getyVals() != null) {
             double elapsed =
-                    mPlotter.getmDataIndex() / (double) mSamplingRate;
+                    mPlotter.getDataIndex() / (double) mSamplingRate;
             msg.append("Elapsed Time: ")
                     .append(getString(R.string.elapsed_time, elapsed)).append("\n");
             msg.append("Points plotted: ")
-                    .append(mPlotter.getmSeries().getyVals().size()).append(
+                    .append(mPlotter.getSeries().getyVals().size()).append(
                     "\n");
         }
+        String versionName = "NA";
+        try {
+            versionName = getPackageManager()
+                    .getPackageInfo(getPackageName(), 0).versionName;
+
+        } catch (Exception ex) {
+            // Do nothing
+        }
+        msg.append("KE.Net ECG Version: ").
+                append(versionName).append("\n");
         msg.append("Polar BLE API Version: ").
                 append(PolarBleApiDefaultImpl.versionInfo()).append("\n");
         msg.append("Location Permission: ")
@@ -929,9 +842,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 //                                    Log.d(TAG, "timeOffset=" + (now - ts) +
 //                                            " " + new Date(now - ts));
                                 if (mPlaying) {
-                                    mPlotter.addValues(mPlot, polarEcgData);
+                                    mPlotter.addValues(polarEcgData);
                                     double elapsed =
-                                            mPlotter.getmDataIndex() / 130.;
+                                            mPlotter.getDataIndex() / 130.;
                                     mTextViewTime.setText(getString(R.string.elapsed_time, elapsed));
                                 }
                             },
@@ -947,15 +860,6 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             mEcgDisposable.dispose();
             mEcgDisposable = null;
         }
-    }
-
-    @Override
-    public void update() {
-        runOnUiThread(() -> {
-//                Log.d(TAG, "update (UI) thread: " + Thread.currentThread()
-//                .getName());
-            mPlot.redraw();
-        });
     }
 
     public void checkBT() {
@@ -1033,8 +937,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 if (mOrientationChanged) {
                     mOrientationChanged = false;
                     Log.d(TAG, "onAfterDraw: orientation changed");
-                    setupPlot();
-                    mPlotter.updatePlot(mPlot);
+                    mPlotter.setupPlot();
+                    mPlotter.updateDomainBoundaries();
+                    mPlotter.update();
                 }
             }
         };
