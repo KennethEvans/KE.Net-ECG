@@ -1,8 +1,10 @@
 package net.kenevans.polar.polarecg;
 
+import android.graphics.Color;
 import android.graphics.RectF;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.View;
 
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
@@ -12,10 +14,9 @@ import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
 import com.androidplot.xy.XYRegionFormatter;
 import com.androidplot.xy.XYSeriesFormatter;
-import com.polar.sdk.api.model.PolarEcgData;
 
 @SuppressWarnings("WeakerAccess")
-public class Plotter implements IConstants {
+public class QRSPlotter implements IConstants {
     // The defaults are for 130 Hz
     private static final int mNLarge = 26;
     // The total number of points = nLarge * total large blocks desired
@@ -26,7 +27,9 @@ public class Plotter implements IConstants {
     private final XYPlot mPlot;
 
     private final XYSeriesFormatter<XYRegionFormatter> mFormatter;
+    private final XYSeriesFormatter<XYRegionFormatter> mFormatter2;
     private final SimpleXYSeries mSeries;
+    private final SimpleXYSeries mSeries2;
     /**
      * The next index in the data
      */
@@ -41,18 +44,22 @@ public class Plotter implements IConstants {
     private final int mTotalDataSize = mNTotalPoints;
 
 
-    public Plotter(ECGActivity activity, XYPlot mPlot,
-                   String title, Integer lineColor, boolean showVertices) {
-        Log.d(TAG, this.getClass().getSimpleName() + " Plotter CTOR");
+    public QRSPlotter(ECGActivity activity, XYPlot mPlot,
+                      String title, boolean showVertices) {
+        Log.d(TAG, this.getClass().getSimpleName() + " ECGPlotter CTOR");
         // This is the activity, needed for resources
         this.activity = activity;
         this.mPlot = mPlot;
         this.mDataIndex = 0;
 
-        mFormatter = new LineAndPointFormatter(lineColor,
-                showVertices ? lineColor : null, null, null);
+        mFormatter = new LineAndPointFormatter(Color.RED,
+                showVertices ? Color.RED : null, null, null);
         mFormatter.setLegendIconEnabled(false);
         mSeries = new SimpleXYSeries(title);
+        mFormatter2 = new LineAndPointFormatter(Color.YELLOW,
+                showVertices ? Color.YELLOW: null, null, null);
+        mFormatter2.setLegendIconEnabled(false);
+        mSeries2 = new SimpleXYSeries(title);
         setupPlot();
     }
 
@@ -62,6 +69,7 @@ public class Plotter implements IConstants {
      */
     public void setupPlot() {
         Log.d(TAG, this.getClass().getSimpleName() + " setupPlot");
+        if(mPlot.getVisibility() == View.GONE) return;
 //        DisplayMetrics displayMetrics = this.getResources()
 //        .getDisplayMetrics();
 //        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
@@ -95,7 +103,8 @@ public class Plotter implements IConstants {
         // rMax is half the total, rMax at top and -rMax at bottom
         RectF gridRect = mPlot.getGraph().getGridRect();
         double rMax =
-                .25 * (gridRect.bottom - gridRect.top) * mDataSize /
+                // Note different from ECG plot
+                .125 * (gridRect.bottom - gridRect.top) * mDataSize /
                         mNLarge / (gridRect.right - gridRect.left);
         // Round it to one decimal point
         rMax = Math.round(rMax * 10) / 10.;
@@ -110,16 +119,17 @@ public class Plotter implements IConstants {
                 " heightPixels=" + displayMetrics.heightPixels);
 
         mPlot.addSeries(mSeries, mFormatter);
+        mPlot.addSeries(mSeries2, mFormatter2);
         mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
         // Set the range block to be .1 mV so a large block will be .5 mV
-        mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .1);
-        mPlot.setLinesPerRangeLabel(5);
+        mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .5);
+//        mPlot.setLinesPerRangeLabel(5);
         mPlot.setDomainBoundaries(-mDataSize, 0, BoundaryMode.FIXED);
         // Set the domain block to be .2 * nlarge so large block will be
         // nLarge samples
         mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
-                .2 * mNLarge);
-        mPlot.setLinesPerDomainLabel(5);
+                mNLarge);
+//        mPlot.setLinesPerDomainLabel(5);
 
         mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
 
@@ -145,46 +155,51 @@ public class Plotter implements IConstants {
     /**
      * Implements a strip chart adding new data at the end.
      *
-     * @param polarEcgData The data that came in.
+     * @param val1 Value for the first series.
+     * @param val2 Value for the second series.
      */
-    public void addValues(PolarEcgData polarEcgData) {
-//        Log.d(TAG,
-//                "addValues: dataIndex=" + dataIndex + " seriesSize=" +
-//                series.size());
-        int nSamples = polarEcgData.samples.size();
-        if (nSamples == 0) return;
+    public void addValues(double val1, double val2) {
+//        Log.d(TAG, this.getClass().getSimpleName()
+//                + "addValues: dataIndex=" + mDataIndex + " mSeriesSize="
+//                + mSeries.size() + " mSeries2Size=" + mSeries2.size()
+//                + " val1=" + val1 + " val2=" + val2);
 
+        if(mPlot.getVisibility() == View.GONE) return;
         // Add the new values, removing old values if needed
-        for (Integer val : polarEcgData.samples) {
-            if (mSeries.size() >= mTotalDataSize) {
-                mSeries.removeFirst();
-            }
-            // Convert from  μV to mV and add to series
-            mSeries.addLast(mDataIndex++, .001 * val);
+        if (mSeries.size() >= mTotalDataSize) {
+            mSeries.removeFirst();
         }
+        if (mSeries2.size() >= mTotalDataSize) {
+            mSeries2.removeFirst();
+        }
+        // Convert from  μV to mV and add to series
+        mSeries.addLast(mDataIndex, .001 * val1);
+        mSeries2.addLast(mDataIndex, .001 * val2);
+        mDataIndex++;
         // Reset the domain boundaries
         updateDomainBoundaries();
         update();
     }
 
     public void updateDomainBoundaries() {
+        if(mPlot.getVisibility() == View.GONE) return;
         long plotMin, plotMax;
         plotMin = mDataIndex - mDataSize;
         plotMax = mDataIndex;
         mPlot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
-//        Log.d(TAG, this.getClass().getSimpleName() + " updatePlot: "
+//        Log.d(TAG, this.getClass().getSimpleName() + " updateDomainBoundaries: "
 //                + "plotMin=" + plotMin + " plotmax=" + plotMax
 //                + " size=" + mSeries.size());
 //        int colorInt = mPlot.getGraph().getGridBackgroundPaint().getColor();
 //        String hexColor = String.format("#%06X", (0xFFFFFF & colorInt));
 //        Log.d(TAG, "gridBgColor=" + hexColor);
-        update();
     }
 
     /**
      * Updates the plot. Runs on the UI thread.
      */
     public void update() {
+        if(mPlot.getVisibility() == View.GONE) return;
         //            Log.d(TAG, this.getClass().getSimpleName()
         //                    + " update: thread: " + Thread.currentThread()
         //                    .getName());
@@ -195,6 +210,7 @@ public class Plotter implements IConstants {
      * Clears the plot and resets dataIndex
      */
     public void clear() {
+        if(mPlot.getVisibility() == View.GONE) return;
         mDataIndex = 0;
         mSeries.clear();
         update();

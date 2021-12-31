@@ -67,6 +67,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -79,10 +80,18 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     // Currently the sampling rate is fixed at 130
     private static final int mSamplingRate = 130;
     List<DeviceInfo> mMruDevices;
-    private XYPlot mPlot;
-    private Plotter mPlotter;
-    private PlotListener mPlotListener;
+    private XYPlot mECGPlot;
+    private XYPlot mHRPlot;
+    private XYPlot mQRSPlot;
+    private ECGPlotter mECGPlotter;
+    private HRPlotter mHRPlotter;
+    private QRSPlotter mQRSPlotter;
+    private PlotListener mEcgPlotListener;
     private boolean mOrientationChanged = false;
+    private QRSDetection qrs;
+
+//    public boolean useQRSPlotter = true;
+    public boolean mUseQRSPlot = true;
 
     /***
      * Whether to save as CSV, Plot, or both.
@@ -104,6 +113,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     //* Date when stopped playing. Updated whenever playing started or
     // stopped. */
     private Date mStopTime;
+    private Date mStartTime;
 
     private final ActivityResultLauncher<Intent> enableBluetoothLauncher =
             registerForActivityResult(
@@ -176,11 +186,26 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         mTextViewHR = findViewById(R.id.info);
         mTextViewFW = findViewById(R.id.fw);
         mTextViewTime = findViewById(R.id.time);
-        mPlot = findViewById(R.id.plot);
+        mECGPlot = findViewById(R.id.ecgplot);
+        mHRPlot = findViewById(R.id.hrplot);
+        mQRSPlot = findViewById(R.id.qrsplot);
+
+        // Make the QRS plot and it's layout Gone
+        if(!mUseQRSPlot) {
+            mQRSPlot.setVisibility(View.GONE);
+            ConstraintLayout constraintLayout = findViewById(R.id.qrs);
+            constraintLayout.setVisibility(View.GONE);
+//            // Reset the weights
+//            constraintLayout = findViewById(R.id.top);
+//            ConstraintSet constraintSet = new ConstraintSet();
+//            constraintSet.clone(constraintLayout);
+//            constraintSet.setVerticalWeight(R.id.ecg, 0.7f);
+//            constraintSet.setVerticalWeight(R.id.hr, 0.3f);
+        }
+
         mSharedPreferences = getPreferences(MODE_PRIVATE);
         mStopHR = mTextViewHR.getText().toString();
         mStopTime = new Date();
-
 
         // Start Bluetooth
         mDeviceId = mSharedPreferences.getString(PREF_DEVICE_ID, "");
@@ -217,12 +242,24 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         if (mApi != null) mApi.foregroundEntered();
         invalidateOptionsMenu();
 
-        // Setup the plot if not done
-        Log.d(TAG, "    mPlotter=" + mPlotter);
-        if (mPlotter == null) {
-            mPlot.post(() -> mPlotter =
-                    new Plotter(this, mPlot,
+        // Setup the plots if not done
+        Log.d(TAG,
+                "    mECGPlotter=" + mECGPlotter + " mHRPlotter=" + mHRPlotter
+                        + " mQRSPlotter=" + mQRSPlotter);
+        if (mECGPlotter == null) {
+            mECGPlot.post(() -> mECGPlotter =
+                    new ECGPlotter(this, mECGPlot,
                             "ECG", Color.RED, false));
+        }
+        if (mHRPlotter == null) {
+            mHRPlot.post(() -> mHRPlotter =
+                    new HRPlotter(this, mHRPlot,
+                            "HR-RR", false));
+        }
+        if (mQRSPlotter == null) {
+            mQRSPlot.post(() -> mQRSPlotter =
+                    new QRSPlotter(this, mQRSPlot,
+                            "HR-RR", false));
         }
 
         // Start the connection to the device
@@ -307,7 +344,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 mTextViewTime.setText(getString(R.string.elapsed_time,
                         0.0));
                 // Clear the plot
-                mPlotter.clear();
+                mECGPlotter.clear();
+                mQRSPlotter.clear();
                 if (mEcgDisposable == null) {
                     // Turns it on
                     streamECG();
@@ -368,7 +406,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         }
         // Cannot do this now as the screen changes have only been dispatched
         mOrientationChanged = true;
-        mPlot.post(() -> mPlot.redraw());
+        mECGPlot.post(() -> mECGPlot.redraw());
     }
 
 
@@ -554,19 +592,19 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
 //        mNLarge = (int) Math.round(.2 * samplingRate);
 //        mNTotalPoints = 150 * mNLarge;
 //        mNPlotPoints = 20 * mNLarge;
-//        mPlot.post(() -> {
-//            mPlotter =
-//                    new Plotter(this, mPlot,
+//        mECGPlot.post(() -> {
+//            mECGPlotter =
+//                    new ECGPlotter(this, mECGPlot,
 //                            "PPG", Color.RED, false);
 //        });
 //    }
 
     private void allowPan(boolean allow) {
         if (allow) {
-            PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL,
+            PanZoom.attach(mECGPlot, PanZoom.Pan.HORIZONTAL,
                     PanZoom.Zoom.NONE);
         } else {
-            PanZoom.attach(mPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
+            PanZoom.attach(mECGPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
         }
     }
 
@@ -650,7 +688,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             try (FileOutputStream strm =
                          new FileOutputStream(pfd.getFileDescriptor())) {
                 final LinkedList<Number> vals =
-                        mPlotter.getSeries().getyVals();
+                        mECGPlotter.getSeries().getyVals();
                 final int nSamples = vals.size();
                 Bitmap bm = EcgImage.createImage(this,
                         mSamplingRate,
@@ -715,7 +753,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 out.write(note + "\n");
                 out.write("HR " + mStopHR + "\n");
                 // Write samples
-                LinkedList<Number> vals = mPlotter.getSeries().getyVals();
+                LinkedList<Number> vals = mECGPlotter.getSeries().getyVals();
                 int nSamples = vals.size();
                 out.write(nSamples + " values " + String.format(Locale.US
                         , "%" +
@@ -749,14 +787,14 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         msg.append("Playing: ").append(mPlaying).append("\n");
         msg.append("Receiving ECG: ").append(mEcgDisposable != null).append(
                 "\n");
-        if (mPlotter != null && mPlotter.getSeries() !=
-                null && mPlotter.getSeries().getyVals() != null) {
+        if (mECGPlotter != null && mECGPlotter.getSeries() !=
+                null && mECGPlotter.getSeries().getyVals() != null) {
             double elapsed =
-                    mPlotter.getDataIndex() / (double) mSamplingRate;
+                    mECGPlotter.getDataIndex() / (double) mSamplingRate;
             msg.append("Elapsed Time: ")
                     .append(getString(R.string.elapsed_time, elapsed)).append("\n");
             msg.append("Points plotted: ")
-                    .append(mPlotter.getSeries().getyVals().size()).append(
+                    .append(mECGPlotter.getSeries().getyVals().size()).append(
                     "\n");
         }
         String versionName = "NA";
@@ -842,9 +880,14 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
 //                                    Log.d(TAG, "timeOffset=" + (now - ts) +
 //                                            " " + new Date(now - ts));
                                 if (mPlaying) {
-                                    mPlotter.addValues(polarEcgData);
+                                    if (qrs == null) {
+                                        qrs = new QRSDetection(ECGActivity.this,
+                                                mECGPlotter, mHRPlotter,
+                                                mQRSPlotter);
+                                    }
+                                    qrs.process(polarEcgData);
                                     double elapsed =
-                                            mPlotter.getDataIndex() / 130.;
+                                            mECGPlotter.getDataIndex() / 130.;
                                     mTextViewTime.setText(getString(R.string.elapsed_time, elapsed));
                                 }
                             },
@@ -909,7 +952,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             streamECG();
         }
         mPlaying = false;
-        if (mPlotter != null) mPlotter.clear();
+        if (mECGPlotter != null) mECGPlotter.clear();
+        if (mQRSPlotter != null) mQRSPlotter.clear();
         mTextViewHR.setText("");
         mTextViewTime.setText("");
         mTextViewFW.setText("");
@@ -917,11 +961,11 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         Toast.makeText(this,
                 getString(R.string.connecting) + " " + mDeviceId,
                 Toast.LENGTH_SHORT).show();
-        if (mPlotListener != null) {
-            mPlot.removeListener(mPlotListener);
-            mPlotListener = null;
+        if (mEcgPlotListener != null) {
+            mECGPlot.removeListener(mEcgPlotListener);
+            mEcgPlotListener = null;
         }
-        mPlotListener = new PlotListener() {
+        mEcgPlotListener = new PlotListener() {
             @Override
             public void onBeforeDraw(Plot source, Canvas canvas) {
             }
@@ -937,13 +981,13 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 if (mOrientationChanged) {
                     mOrientationChanged = false;
                     Log.d(TAG, "onAfterDraw: orientation changed");
-                    mPlotter.setupPlot();
-                    mPlotter.updateDomainBoundaries();
-                    mPlotter.update();
+                    mECGPlotter.setupPlot();
+                    mECGPlotter.updateDomainBoundaries();
+                    mECGPlotter.update();
                 }
             }
         };
-        mPlot.addListener(mPlotListener);
+        mECGPlot.addListener(mEcgPlotListener);
 
         mApi = PolarBleApiDefaultImpl.defaultImplementation(this,
                 PolarBleApi.FEATURE_POLAR_SENSOR_STREAMING |
@@ -1027,6 +1071,14 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
 //                            "*HR " + polarHrData.hr + " mPlaying=" +
 //                            mPlaying);
                     mTextViewHR.setText(String.valueOf(polarHrData.hr));
+                    // Add to HR plot
+                    long time = new Date().getTime();
+                    mHRPlotter.addHrValue(time, polarHrData.hr);
+                    int nRr = polarHrData.rrsMs.size();
+                    if (nRr > 0) {
+                        mHRPlotter.addRrValues(time, polarHrData.rrsMs);
+                    }
+                    mHRPlotter.update();
                 }
             }
         });

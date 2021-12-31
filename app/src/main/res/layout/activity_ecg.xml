@@ -9,15 +9,15 @@
         android:id="@+id/ecg"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toTopOf="@id/rr"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/qrs"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_chainStyle="spread"
         app:layout_constraintVertical_weight="0.7">
 
         <com.androidplot.xy.XYPlot
-            android:id="@+id/plot"
+            android:id="@+id/ecgplot"
             style="@style/FullScreenGraph"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -84,30 +84,102 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/rr"
+        android:id="@+id/qrs"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ecg"
+        app:layout_constraintBottom_toTopOf="@id/hr"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/ecg"
         app:layout_constraintVertical_chainStyle="spread"
         app:layout_constraintVertical_weight="0.3">
 
-        <!--        <TextView
-                    android:visibility="visible"
-                    android:background="#000000"
-                    android:id="@+id/test"
-                    android:layout_width="300dp"
-                    android:layout_height="300dp"
-                    android:layout_marginLeft="8dp"
-                    android:layout_marginRight="8dp"
-                    android:layout_marginBottom="8dp"
-                    android:textColor="#000000"
-                    android:textSize="14sp"
-                    app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintRight_toRightOf="parent" />
-        -->
+        <com.androidplot.xy.XYPlot
+            android:id="@+id/qrsplot"
+            style="@style/FullScreenGraph"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+
+            app:backgroundColor="#000000"
+            app:domainLineColor="#555555"
+            app:domainOriginLineColor="#555555"
+            app:domainTitle="@string/hr_domain_title"
+            app:domainTitleTextColor="#FFFFFF"
+
+            app:domainTitleTextSize="14dp"
+            app:graphBackgroundColor="#000000"
+            app:graphMarginBottom="20dp"
+            app:graphMarginLeft="30dp"
+            app:graphMarginRight="30dp"
+            app:graphMarginTop="20dp"
+            app:gridBackgroundColor="#000000"
+            app:gridInsetBottom="20dp"
+            app:gridInsetLeft="25dp"
+            app:lineLabels="left|bottom"
+            app:paddingBottom="5dp"
+            app:paddingLeft="5dp"
+            app:paddingRight="5dp"
+            app:paddingTop="5dp"
+            app:rangeLineColor="#555555"
+            app:rangeOriginLineColor="#555555"
+            app:rangeTitle="@string/hr_range_title"
+            app:rangeTitleTextColor="#FFFFFF"
+            app:rangeTitleTextSize="14dp"
+            app:renderMode="use_background_thread"
+            app:title="@string/hr_title"
+
+            app:titleTextColor="#000000"
+            app:titleTextSize="15dp" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/hr"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/qrs"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintVertical_chainStyle="spread"
+        app:layout_constraintVertical_weight="0.3">
+
+        <com.androidplot.xy.XYPlot
+            android:id="@+id/hrplot"
+            style="@style/FullScreenGraph"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+
+            app:backgroundColor="#000000"
+            app:domainLineColor="#555555"
+            app:domainOriginLineColor="#555555"
+            app:domainTitle="@string/hr_domain_title"
+            app:domainTitleTextColor="#FFFFFF"
+
+            app:domainTitleTextSize="14dp"
+            app:graphBackgroundColor="#000000"
+            app:graphMarginBottom="20dp"
+            app:graphMarginLeft="30dp"
+            app:graphMarginRight="30dp"
+            app:graphMarginTop="20dp"
+            app:gridBackgroundColor="#000000"
+            app:gridInsetBottom="20dp"
+            app:gridInsetLeft="25dp"
+            app:lineLabels="left|bottom"
+            app:paddingBottom="5dp"
+            app:paddingLeft="5dp"
+            app:paddingRight="5dp"
+            app:paddingTop="5dp"
+            app:rangeLineColor="#555555"
+            app:rangeOriginLineColor="#555555"
+            app:rangeTitle="@string/hr_range_title"
+            app:rangeTitleTextColor="#FFFFFF"
+            app:rangeTitleTextSize="14dp"
+            app:renderMode="use_background_thread"
+            app:title="@string/hr_title"
+
+            app:titleTextColor="#000000"
+            app:titleTextSize="15dp" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

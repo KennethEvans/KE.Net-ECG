@@ -25,6 +25,12 @@
     <string name="info_string">%1$s\nBattery level: %2$s\nFirmware: %3$s\nID: %4$s\n</string>
     <string name="connected_string">Connected to %1$s</string>
 
+    <string name="label_hr">Heart Rate: </string>
+    <string name="label_rr">R-R: </string>
+    <string name="hr_title">HR and RR vs. Time</string>
+    <string name="hr_range_title">HR, /sec RR, ms/10</string>
+    <string name="hr_domain_title">Time</string>
+
     <!-- Utils -->
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
