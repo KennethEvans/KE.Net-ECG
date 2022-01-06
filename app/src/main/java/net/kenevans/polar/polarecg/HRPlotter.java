@@ -34,6 +34,10 @@ public class HRPlotter implements IConstants, IQRSConstants {
     private final boolean mPlotHr2 = true;
     private final boolean mPlotRr2 = true;
     private double mPlotStartTime = Double.NaN;
+    /**
+     * This is the last time a value was added to the plot. Used to set the
+     * domain and range boundaries.
+     **/
     private double mLastTime = Double.NaN;
     private final long mDomainInterval = 1 * 60000;  // 1 min
     private final RunningMax mRunningMax1 = new RunningMax(50);
@@ -173,82 +177,79 @@ public class HRPlotter implements IConstants, IQRSConstants {
 //        update();
 //    }
 
-    public void addHrValue1(double time, double hr) {
+    @SuppressWarnings("ConstantConditions")
+    public void addValues1(double time, double hr, List<Integer> rrsMs) {
 //        Log.d(TAG, this.getClass().getSimpleName() + ": addHrValues: time="
 //                + mDateFormatSec.format(time) + " hr=" + hr + " hrSize=" +
 //                hrSeries1.size());
-        if (!mPlotHr1) return;
-        if (Double.isNaN(mPlotStartTime)) mPlotStartTime = time;
-        if (Double.isNaN(mLastTime)) {
-            mLastTime = time;
-        } else if (time > mLastTime) {
-            mLastTime = time;
+        if (mPlotHr1 || mPlotRr1) {
+            if (Double.isNaN(mPlotStartTime)) mPlotStartTime = time;
+            if (Double.isNaN(mLastTime)) {
+                mLastTime = time;
+            } else if (time > mLastTime) {
+                mLastTime = time;
+            }
         }
-        mRunningMax1.add(hr);
-        hrSeries1.addLast(time, hr);
-    }
 
-    public void addRrValues1(double time, List<Integer> rrsMs) {
-//        Log.d(TAG, this.getClass().getSimpleName() + ": addRrValues: time"
-//                + mDateFormatSec.format(time) + " rrsMs.size=" + rrsMs.size()
-//                + " rrSize=" + rrSeries1.size());
-        if (!mPlotRr1 || rrsMs.size() == 0) return;
-        if (Double.isNaN(mPlotStartTime)) mPlotStartTime = time;
-        if (Double.isNaN(mLastTime)) {
-            mLastTime = time;
-        } else if (time > mLastTime) {
-            mLastTime = time;
+        // HR
+        if (mPlotHr1) {
+            mRunningMax1.add(hr);
+            hrSeries1.addLast(time, hr);
         }
+
+        // RR
         int nRrVals = rrsMs.size();
-        double[] tVals = new double[nRrVals];
-        Integer[] rrVals = new Integer[nRrVals];
-        rrVals = rrsMs.toArray(rrVals);
-        // Find the sum of the RR intervals
-        double totalRR = 0;
-        for (int i = 0; i < nRrVals; i++) {
-            totalRR += rrVals[i];
-        }
-        // First time
-        if (Double.isInfinite(mStartRrTime)) {
-            mStartRrTime = mLastRrTime = mLastUpdateTime = time - totalRR;
-            mTotalRrTime = 0;
-        }
-        mTotalRrTime += totalRR;
+        if (mPlotRr1 && nRrVals > 0) {
+            double[] tVals = new double[nRrVals];
+            Integer[] rrVals = new Integer[nRrVals];
+            rrVals = rrsMs.toArray(rrVals);
+            // Find the sum of the RR intervals
+            double totalRR = 0;
+            for (int i = 0; i < nRrVals; i++) {
+                totalRR += rrVals[i];
+            }
+            // First time
+            if (Double.isInfinite(mStartRrTime)) {
+                mStartRrTime = mLastRrTime = mLastUpdateTime = time - totalRR;
+                mTotalRrTime = 0;
+            }
+            mTotalRrTime += totalRR;
 //        Log.d(TAG, "lastRrTime=" + mLastRrTime
 //                + " totalRR=" + totalRR
 //                + " elapsed=" + (mLastRrTime - mStartRrTime)
 //                + " totalRrTime=" + mTotalRrTime);
 
-        double rr;
-        double t = mLastRrTime;
-        for (int i = 0; i < nRrVals; i++) {
-            rr = rrVals[i];
-            t += rr;
-            tVals[i] = t;
-        }
-        // Keep them in this interval
-        if (nRrVals > 0 && tVals[0] < mLastUpdateTime) {
-            double deltaT = mLastUpdateTime = tVals[0];
-            t += deltaT;
+            double rr;
+            double t = mLastRrTime;
             for (int i = 0; i < nRrVals; i++) {
-                tVals[i] += deltaT;
+                rr = rrVals[i];
+                t += rr;
+                tVals[i] = t;
             }
-        }
-        // Keep them from being in the future
-        if (t > time) {
-            double deltaT = t - time;
+            // Keep them in this interval
+            if (tVals[0] < mLastUpdateTime) {
+                double deltaT = mLastUpdateTime = tVals[0];
+                t += deltaT;
+                for (int i = 0; i < nRrVals; i++) {
+                    tVals[i] += deltaT;
+                }
+            }
+            // Keep them from being in the future
+            if (t > time) {
+                double deltaT = t - time;
+                for (int i = 0; i < nRrVals; i++) {
+                    tVals[i] -= deltaT;
+                }
+            }
+            // Add to the series
             for (int i = 0; i < nRrVals; i++) {
-                tVals[i] -= deltaT;
+                rr = RR_SCALE * rrVals[i];
+                mRunningMax1.add(rr);
+                rrSeries1.addLast(tVals[i], rr);
+                mLastRrTime = tVals[i];
             }
+            mLastUpdateTime = time;
         }
-        // Add to the series
-        for (int i = 0; i < nRrVals; i++) {
-            rr = RR_SCALE * rrVals[i];
-            mRunningMax1.add(rr);
-            rrSeries1.addLast(tVals[i], rr);
-            mLastRrTime = tVals[i];
-        }
-        mLastUpdateTime = time;
     }
 
     @SuppressWarnings("ConstantConditions")
