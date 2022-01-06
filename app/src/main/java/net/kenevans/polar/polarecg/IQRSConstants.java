@@ -2,10 +2,28 @@ package net.kenevans.polar.polarecg;
 
 interface IQRSConstants {
     /**
-     * Sampling rate.  These algorithms are based on this particular sampling
+     * Sampling rate. These algorithms are based on this particular sampling
      * rate.
      */
     double FS = 130.0;
+    /**
+     * Number of small boxes in a large box.
+     */
+    int N_SMALL_BOXES_PER_LARGE_BOX = 5;
+    /**
+     * The number of samples in a large box on an ECG plot.
+     */
+    int N_LARGE = (int) (FS / N_SMALL_BOXES_PER_LARGE_BOX); // =26
+    /**
+     * The total number of points to keep.
+     */
+    int N_TOTAL_POINTS = (int) (30 * FS);  // =3900 -> 30 sec
+    /**
+     * The number of points to show in an ECG plot.
+     */
+    int N_ECG_PLOT_POINTS = 4 * N_SMALL_BOXES_PER_LARGE_BOX * N_LARGE;
+    // =520 points -> 4 sec
+
     /**
      * Data window size.  Must be large enough for maximum number of
      * coefficients.
@@ -36,6 +54,17 @@ interface IQRSConstants {
      * 18 chosen empirically.
      */
     int SCORE_OFFSET = 18;
+
+    /**
+     * Convert μV to mV.
+     */
+    double MICRO_TO_MILLI_VOLT = .001;
+
+    /**
+     * Convert millisecond to seconds.
+     */
+    double MS_TO_SEC = .001;
+
     /**
      * Filter coefficients for Butterworth fs=130 low_cutoff=5 high_cutoff=20
      */

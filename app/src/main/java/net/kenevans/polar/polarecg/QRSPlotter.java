@@ -16,50 +16,50 @@ import com.androidplot.xy.XYRegionFormatter;
 import com.androidplot.xy.XYSeriesFormatter;
 
 @SuppressWarnings("WeakerAccess")
-public class QRSPlotter implements IConstants {
-    // The defaults are for 130 Hz
-    private static final int mNLarge = 26;
-    // The total number of points = nLarge * total large blocks desired
-    private static final int mNTotalPoints = 150 * mNLarge;  // 150 = 30 sec
-    private static final int mNPlotPoints = 20 * mNLarge;    // 20 points
-
+public class QRSPlotter implements IConstants, IQRSConstants {
     private final ECGActivity activity;
     private final XYPlot mPlot;
 
-    private final XYSeriesFormatter<XYRegionFormatter> mFormatter;
+    private final XYSeriesFormatter<XYRegionFormatter> mFormatter1;
+    private final SimpleXYSeries mSeries1;
     private final XYSeriesFormatter<XYRegionFormatter> mFormatter2;
-    private final SimpleXYSeries mSeries;
     private final SimpleXYSeries mSeries2;
+    private final XYSeriesFormatter<XYRegionFormatter> mFormatter3;
+    private final SimpleXYSeries mSeries3;
+    private final XYSeriesFormatter<XYRegionFormatter> mFormatter4;
+    private final SimpleXYSeries mSeries4;
+
     /**
      * The next index in the data
      */
     private long mDataIndex;
-    /**
-     * The number of points to show
-     */
-    private final int mDataSize = mNPlotPoints;
-    /**
-     * The total number of points to keep
-     */
-    private final int mTotalDataSize = mNTotalPoints;
 
-
-    public QRSPlotter(ECGActivity activity, XYPlot mPlot,
-                      String title, boolean showVertices) {
+    public QRSPlotter(ECGActivity activity, XYPlot mPlot, String title) {
         Log.d(TAG, this.getClass().getSimpleName() + " ECGPlotter CTOR");
         // This is the activity, needed for resources
         this.activity = activity;
         this.mPlot = mPlot;
         this.mDataIndex = 0;
 
-        mFormatter = new LineAndPointFormatter(Color.RED,
-                showVertices ? Color.RED : null, null, null);
-        mFormatter.setLegendIconEnabled(false);
-        mSeries = new SimpleXYSeries(title);
+        mFormatter1 = new LineAndPointFormatter(Color.rgb(0, 153, 255),
+                null, null, null);
+        mFormatter1.setLegendIconEnabled(false);
+        mSeries1 = new SimpleXYSeries(title);
+
         mFormatter2 = new LineAndPointFormatter(Color.YELLOW,
-                showVertices ? Color.YELLOW: null, null, null);
+                null, null, null);
         mFormatter2.setLegendIconEnabled(false);
         mSeries2 = new SimpleXYSeries(title);
+
+        mFormatter3 = new LineAndPointFormatter(Color.GREEN,
+                null, null, null);
+        mFormatter3.setLegendIconEnabled(false);
+        mSeries3 = new SimpleXYSeries(title);
+
+        mFormatter4 = new LineAndPointFormatter(null,
+                Color.RED, null, null);
+        mFormatter4.setLegendIconEnabled(false);
+        mSeries4 = new SimpleXYSeries(title);
         setupPlot();
     }
 
@@ -69,7 +69,7 @@ public class QRSPlotter implements IConstants {
      */
     public void setupPlot() {
         Log.d(TAG, this.getClass().getSimpleName() + " setupPlot");
-        if(mPlot.getVisibility() == View.GONE) return;
+        if (mPlot.getVisibility() == View.GONE) return;
 //        DisplayMetrics displayMetrics = this.getResources()
 //        .getDisplayMetrics();
 //        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
@@ -104,8 +104,8 @@ public class QRSPlotter implements IConstants {
         RectF gridRect = mPlot.getGraph().getGridRect();
         double rMax =
                 // Note different from ECG plot
-                .125 * (gridRect.bottom - gridRect.top) * mDataSize /
-                        mNLarge / (gridRect.right - gridRect.left);
+                .125 * (gridRect.bottom - gridRect.top) * N_ECG_PLOT_POINTS /
+                        N_LARGE / (gridRect.right - gridRect.left);
         // Round it to one decimal point
         rMax = Math.round(rMax * 10) / 10.;
         Log.d(TAG, "    rMax = " + rMax);
@@ -118,17 +118,19 @@ public class QRSPlotter implements IConstants {
         Log.d(TAG, "    display widthPixels=" + displayMetrics.widthPixels +
                 " heightPixels=" + displayMetrics.heightPixels);
 
-        mPlot.addSeries(mSeries, mFormatter);
+        mPlot.addSeries(mSeries1, mFormatter1);
         mPlot.addSeries(mSeries2, mFormatter2);
+        mPlot.addSeries(mSeries3, mFormatter3);
+        mPlot.addSeries(mSeries4, mFormatter4);
         mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
         // Set the range block to be .1 mV so a large block will be .5 mV
         mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .5);
 //        mPlot.setLinesPerRangeLabel(5);
-        mPlot.setDomainBoundaries(-mDataSize, 0, BoundaryMode.FIXED);
-        // Set the domain block to be .2 * nlarge so large block will be
+        mPlot.setDomainBoundaries(-N_ECG_PLOT_POINTS, 0, BoundaryMode.FIXED);
+        // Set the domain block to be .2 * N_LARGE so large block will be
         // nLarge samples
         mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
-                mNLarge);
+                N_LARGE);
 //        mPlot.setLinesPerDomainLabel(5);
 
         mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
@@ -148,48 +150,80 @@ public class QRSPlotter implements IConstants {
         update();
     }
 
-    public SimpleXYSeries getSeries() {
-        return mSeries;
-    }
-
     /**
      * Implements a strip chart adding new data at the end.
      *
      * @param val1 Value for the first series.
      * @param val2 Value for the second series.
+     * @param val3 Value for the third series.
      */
-    public void addValues(double val1, double val2) {
+    public void addValues(Number val1, Number val2, Number val3) {
 //        Log.d(TAG, this.getClass().getSimpleName()
 //                + "addValues: dataIndex=" + mDataIndex + " mSeriesSize="
-//                + mSeries.size() + " mSeries2Size=" + mSeries2.size()
+//                + mSeries1.size() + " mSeries2Size=" + mSeries2.size()
 //                + " val1=" + val1 + " val2=" + val2);
 
-        if(mPlot.getVisibility() == View.GONE) return;
+        if (mPlot.getVisibility() == View.GONE) return;
+
         // Add the new values, removing old values if needed
-        if (mSeries.size() >= mTotalDataSize) {
-            mSeries.removeFirst();
+        // Convert from  μV to mV
+        if (val1 != null) {
+            if (mSeries1.size() >= N_TOTAL_POINTS) {
+                mSeries1.removeFirst();
+            }
+            mSeries1.addLast(mDataIndex, val1);
         }
-        if (mSeries2.size() >= mTotalDataSize) {
-            mSeries2.removeFirst();
+
+        if (val2 != null) {
+            if (mSeries2.size() >= N_TOTAL_POINTS) {
+                mSeries2.removeFirst();
+            }
+            mSeries2.addLast(mDataIndex, val2);
         }
-        // Convert from  μV to mV and add to series
-        mSeries.addLast(mDataIndex, .001 * val1);
-        mSeries2.addLast(mDataIndex, .001 * val2);
+
+        if (val3 != null) {
+            if (mSeries3.size() >= N_TOTAL_POINTS) {
+                mSeries3.removeFirst();
+            }
+            mSeries3.addLast(mDataIndex, val3);
+        }
+
         mDataIndex++;
         // Reset the domain boundaries
         updateDomainBoundaries();
         update();
     }
 
+    public void addPeakValue(int sample, double ecg) {
+//        Log.d(TAG, this.getClass().getSimpleName()
+//                + "addPeakValue: dataIndex=" + mDataIndex + " mSeriesSize="
+//                + mSeries4.size()
+//                + " sample=" + sample + " ecg=" + ecg);
+//
+        if (mPlot.getVisibility() == View.GONE) return;
+
+        // Remove old values if needed
+        long xMin = mDataIndex - N_TOTAL_POINTS;
+        while (mSeries4.size() > 0 && (int) mSeries4.getxVals().getFirst() < xMin) {
+            mSeries4.removeFirst();
+//                Log.d(TAG, "sample=" + sample + " deleted="
+//                + mSeries4.getxVals().getFirst());
+        }
+        mSeries4.addLast(sample, ecg);
+//        Log.d(TAG, "added sample=" + sample + " size=" + mSeries4.size()
+//                + " xmin=" + xMin + " mDataIndex=" + mDataIndex);
+    }
+
     public void updateDomainBoundaries() {
-        if(mPlot.getVisibility() == View.GONE) return;
+        if (mPlot.getVisibility() == View.GONE) return;
         long plotMin, plotMax;
-        plotMin = mDataIndex - mDataSize;
+        plotMin = mDataIndex - N_ECG_PLOT_POINTS;
         plotMax = mDataIndex;
         mPlot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
-//        Log.d(TAG, this.getClass().getSimpleName() + " updateDomainBoundaries: "
+//        Log.d(TAG, this.getClass().getSimpleName() + "
+//        updateDomainBoundaries: "
 //                + "plotMin=" + plotMin + " plotmax=" + plotMax
-//                + " size=" + mSeries.size());
+//                + " size=" + mSeries1.size());
 //        int colorInt = mPlot.getGraph().getGridBackgroundPaint().getColor();
 //        String hexColor = String.format("#%06X", (0xFFFFFF & colorInt));
 //        Log.d(TAG, "gridBgColor=" + hexColor);
@@ -199,24 +233,22 @@ public class QRSPlotter implements IConstants {
      * Updates the plot. Runs on the UI thread.
      */
     public void update() {
-        if(mPlot.getVisibility() == View.GONE) return;
+        if (mPlot.getVisibility() == View.GONE) return;
         //            Log.d(TAG, this.getClass().getSimpleName()
         //                    + " update: thread: " + Thread.currentThread()
         //                    .getName());
-        activity.runOnUiThread(mPlot::redraw);
+        if(mDataIndex % 73 == 0) {
+            activity.runOnUiThread(mPlot::redraw);
+        }
     }
 
     /**
      * Clears the plot and resets dataIndex
      */
     public void clear() {
-        if(mPlot.getVisibility() == View.GONE) return;
+        if (mPlot.getVisibility() == View.GONE) return;
         mDataIndex = 0;
-        mSeries.clear();
+        mSeries1.clear();
         update();
-    }
-
-    public long getDataIndex() {
-        return mDataIndex;
     }
 }

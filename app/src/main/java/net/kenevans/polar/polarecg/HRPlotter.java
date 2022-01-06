@@ -25,7 +25,7 @@ import java.util.Locale;
 
 import androidx.annotation.NonNull;
 
-public class HRPlotter implements IConstants {
+public class HRPlotter implements IConstants, IQRSConstants {
     private final ECGActivity activity;
     private final XYPlot mPlot;
 
@@ -33,7 +33,7 @@ public class HRPlotter implements IConstants {
     private final boolean mPlotRr = true;
     private double mPlotStartTime = Double.NaN;
     private double mLastTime = Double.NaN;
-    private final long mDomainInterval = 5 * 60000;  // 5 min
+    private final long mDomainInterval = 2 * 60000;  // 2 min
     private final RunningMax mRunningMax = new RunningMax(250);
 
     private double mStartRrTime = Double.NEGATIVE_INFINITY;
@@ -262,8 +262,8 @@ public class HRPlotter implements IConstants {
     }
 
     public String getRrInfo() {
-        double elapsed = .001 * (mLastRrTime - mStartRrTime);
-        double total = .001 * mTotalRrTime;
+        double elapsed = MS_TO_SEC * (mLastRrTime - mStartRrTime);
+        double total = MS_TO_SEC * mTotalRrTime;
         double ratio = total / elapsed;
         return "Tot=" + String.format(Locale.US, "%.2f s", elapsed)
                 + " RR=" + String.format(Locale.US, "%.2f s", total)

@@ -15,13 +15,7 @@ import com.androidplot.xy.XYSeriesFormatter;
 import com.polar.sdk.api.model.PolarEcgData;
 
 @SuppressWarnings("WeakerAccess")
-public class ECGPlotter implements IConstants {
-    // The defaults are for 130 Hz
-    private static final int mNLarge = 26;
-    // The total number of points = nLarge * total large blocks desired
-    private static final int mNTotalPoints = 150 * mNLarge;  // 150 = 30 sec
-    private static final int mNPlotPoints = 20 * mNLarge;    // 20 points
-
+public class ECGPlotter implements IConstants, IQRSConstants {
     private final ECGActivity activity;
     private final XYPlot mPlot;
 
@@ -31,15 +25,6 @@ public class ECGPlotter implements IConstants {
      * The next index in the data
      */
     private long mDataIndex;
-    /**
-     * The number of points to show
-     */
-    private final int mDataSize = mNPlotPoints;
-    /**
-     * The total number of points to keep
-     */
-    private final int mTotalDataSize = mNTotalPoints;
-
 
     public ECGPlotter(ECGActivity activity, XYPlot mPlot,
                       String title, Integer lineColor, boolean showVertices) {
@@ -95,8 +80,8 @@ public class ECGPlotter implements IConstants {
         // rMax is half the total, rMax at top and -rMax at bottom
         RectF gridRect = mPlot.getGraph().getGridRect();
         double rMax =
-                .25 * (gridRect.bottom - gridRect.top) * mDataSize /
-                        mNLarge / (gridRect.right - gridRect.left);
+                .25 * (gridRect.bottom - gridRect.top) * N_ECG_PLOT_POINTS /
+                        N_LARGE / (gridRect.right - gridRect.left);
         // Round it to one decimal point
         rMax = Math.round(rMax * 10) / 10.;
         Log.d(TAG, "    rMax = " + rMax);
@@ -114,11 +99,11 @@ public class ECGPlotter implements IConstants {
         // Set the range block to be .1 mV so a large block will be .5 mV
         mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .1);
         mPlot.setLinesPerRangeLabel(5);
-        mPlot.setDomainBoundaries(-mDataSize, 0, BoundaryMode.FIXED);
+        mPlot.setDomainBoundaries(-N_ECG_PLOT_POINTS, 0, BoundaryMode.FIXED);
         // Set the domain block to be .2 * nlarge so large block will be
         // nLarge samples
         mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
-                .2 * mNLarge);
+                .2 * N_LARGE);
         mPlot.setLinesPerDomainLabel(5);
 
         mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
@@ -156,11 +141,11 @@ public class ECGPlotter implements IConstants {
 
         // Add the new values, removing old values if needed
         for (Integer val : polarEcgData.samples) {
-            if (mSeries.size() >= mTotalDataSize) {
+            if (mSeries.size() >= N_TOTAL_POINTS) {
                 mSeries.removeFirst();
             }
             // Convert from  μV to mV and add to series
-            mSeries.addLast(mDataIndex++, .001 * val);
+            mSeries.addLast(mDataIndex++, MICRO_TO_MILLI_VOLT * val);
         }
         // Reset the domain boundaries
         updateDomainBoundaries();
@@ -169,7 +154,7 @@ public class ECGPlotter implements IConstants {
 
     public void updateDomainBoundaries() {
         long plotMin, plotMax;
-        plotMin = mDataIndex - mDataSize;
+        plotMin = mDataIndex - N_ECG_PLOT_POINTS;
         plotMax = mDataIndex;
         mPlot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
 //        Log.d(TAG, this.getClass().getSimpleName() + " updatePlot: "

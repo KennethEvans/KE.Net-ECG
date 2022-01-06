@@ -54,11 +54,13 @@ import java.io.PrintWriter;
 import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -90,7 +92,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     private boolean mOrientationChanged = false;
     private QRSDetection qrs;
 
-//    public boolean useQRSPlotter = true;
+    //    public boolean useQRSPlotter = true;
     public boolean mUseQRSPlot = true;
 
     /***
@@ -191,7 +193,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         mQRSPlot = findViewById(R.id.qrsplot);
 
         // Make the QRS plot and it's layout Gone
-        if(!mUseQRSPlot) {
+        if (!mUseQRSPlot) {
             mQRSPlot.setVisibility(View.GONE);
             ConstraintLayout constraintLayout = findViewById(R.id.qrs);
             constraintLayout.setVisibility(View.GONE);
@@ -239,6 +241,15 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 + " mOrientationChanged=" + mOrientationChanged);
         super.onResume();
 
+        // Check if PREF_TREE_URI is valid and remove it id not
+        if (UriUtils.getNPersistedPermissions(this) <= 0) {
+            SharedPreferences.Editor editor =
+                    getPreferences(MODE_PRIVATE)
+                            .edit();
+            editor.putString(PREF_TREE_URI, null);
+            editor.apply();
+        }
+
         if (mApi != null) mApi.foregroundEntered();
         invalidateOptionsMenu();
 
@@ -258,8 +269,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         }
         if (mQRSPlotter == null) {
             mQRSPlot.post(() -> mQRSPlotter =
-                    new QRSPlotter(this, mQRSPlot,
-                            "HR-RR", false));
+                    new QRSPlotter(this, mQRSPlot, "HR-RR"));
         }
 
         // Start the connection to the device
@@ -606,6 +616,16 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         } else {
             PanZoom.attach(mECGPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
         }
+        if (mUseQRSPlot) {
+            if (allow) {
+                PanZoom.attach(mQRSPlot, PanZoom.Pan.HORIZONTAL,
+                        PanZoom.Zoom.NONE);
+            } else {
+                PanZoom.attach(mQRSPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
+            }
+
+        }
+
     }
 
     /**
@@ -830,70 +850,123 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     public void streamECG() {
         Log.v(TAG, this.getClass().getSimpleName() + " streamECG:"
                 + "mEcgDisposable=" + mEcgDisposable);
+        SimpleDateFormat sdf =
+                new SimpleDateFormat("dd:MM:yyyy HH:mm:ss", Locale.US);
+        SimpleDateFormat sdf2 =
+                new SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy", Locale.US);
+        /// Use UTC
+        String tz = " UTC";
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+        sdf2.setTimeZone(TimeZone.getTimeZone("UTC"));
+        try {
+            Date epoch = sdf.parse("01:01:2000 00:00:00");
+            Date epoch1 = sdf.parse("01:01:2019 00:00:00");
+//            Log.d(TAG, "epoch=" + epoch + " " + epoch.getTime()
+//                    + " epoch1=" + epoch1 + " " + epoch1.getTime());
+            Log.d(TAG, "epoch=" + sdf2.format(epoch)
+                    + " epoch1=" + sdf2.format(epoch1)
+                    + " " + epoch.getTime()
+                    + " " + epoch1.getTime()
+                    + " " + (epoch1.getTime() - epoch.getTime())
+                    + tz);
+        } catch (
+                Exception ex) {
+            Log.e(TAG, "Error parsing date", ex);
+        }
         if (mEcgDisposable == null) {
+            // Set the local time to get correct timestamps. H10 apparently
+            // resets its time to 01:01:2019 00:00:00 when connected to strap
+            Calendar calNow = Calendar.getInstance();
+//            mApi.setLocalTime(mDeviceId, calNow);
+            Log.d(TAG, "Doing setLocalTime to " + calNow.getTime());
             mEcgDisposable =
+//                    mApi.setLocalTime(mDeviceId, calNow)
+//                    .andThen(
+//                            mApi.requestStreamSettings(mDeviceId,
+//                            PolarBleApi.DeviceStreamingFeature.ECG))
                     mApi.requestStreamSettings(mDeviceId,
-                            PolarBleApi.DeviceStreamingFeature.ECG).
-                            toFlowable().
-                            flatMap((Function<PolarSensorSetting,
-                                    Publisher<PolarEcgData>>) sensorSetting -> {
-                                //                            Log.d(TAG,
-                                //                            "mEcgDisposable
-                                //                            requestEcgSettings " +
-                                //                                    "apply");
-                                //                            Log.d(TAG,
-                                //                                    "sampleRate=" + sensorSetting
-                                //                                    .maxSettings().settings.
-                                //                                            get(PolarSensorSetting
-                                //                                            .SettingType.SAMPLE_RATE) +
-                                //                                            " resolution=" + sensorSetting
-                                //                                            .maxSettings().settings.
-                                //                                            get(PolarSensorSetting
-                                //                                            .SettingType.RESOLUTION) +
-                                //                                            " range=" + sensorSetting
-                                //                                            .maxSettings().settings.
-                                //                                            get(PolarSensorSetting
-                                //                                            .SettingType.RANGE));
-                                return mApi.startEcgStreaming(mDeviceId,
-                                        sensorSetting.maxSettings());
-                            }).observeOn(AndroidSchedulers.mainThread()).subscribe(
-                            polarEcgData -> {
-//                                    double deltaT =
-//                                            .000000001 * (polarEcgData
-//                                            .timeStamp - ecgTime0);
-//                                    ecgTime0 = polarEcgData.timeStamp;
-//                                    int nSamples = polarEcgData.samples
-//                                    .size();
-//                                    double samplesPerSec = nSamples / deltaT;
-//                                    Log.d(TAG,
-//                                            "ecg update:" +
-//                                                    " deltaT=" + String
-//                                                    .format("%.3f", deltaT) +
-//                                                    " nSamples=" + nSamples +
-//                                                    " samplesPerSec=" +
-//                                                    String.format("%.3f",
-//                                                    samplesPerSec));
-
-//                                    long now = new Date().getTime();
-//                                    long ts =
-//                                            polarEcgData.timeStamp / 1000000;
-//                                    Log.d(TAG, "timeOffset=" + (now - ts) +
-//                                            " " + new Date(now - ts));
-                                if (mPlaying) {
-                                    if (qrs == null) {
-                                        qrs = new QRSDetection(ECGActivity.this,
-                                                mECGPlotter, mHRPlotter,
-                                                mQRSPlotter);
-                                    }
-                                    qrs.process(polarEcgData);
-                                    double elapsed =
-                                            mECGPlotter.getDataIndex() / 130.;
-                                    mTextViewTime.setText(getString(R.string.elapsed_time, elapsed));
+                            PolarBleApi.DeviceStreamingFeature.ECG)
+                    .toFlowable()
+                    .flatMap((Function<PolarSensorSetting,
+                            Publisher<PolarEcgData>>) sensorSetting -> {
+                        //                            Log.d(TAG,
+                        //                            "mEcgDisposable
+                        //                            requestEcgSettings " +
+                        //                                    "apply");
+                        //                            Log.d(TAG,
+                        //                                    "sampleRate=" +
+                        //                                    sensorSetting
+                        //                                    .maxSettings()
+                        //                                    .settings.
+                        //                                            get
+                        //                                            (PolarSensorSetting
+                        //                                            .SettingType.SAMPLE_RATE) +
+                        //                                            "
+                        //                                            resolution=" + sensorSetting
+                        //                                            .maxSettings().settings.
+                        //                                            get
+                        //                                            (PolarSensorSetting
+                        //                                            .SettingType.RESOLUTION) +
+                        //                                            "
+                        //                                            range="
+                        //                                            +
+                        //                                            sensorSetting
+                        //                                            .maxSettings().settings.
+                        //                                            get
+                        //                                            (PolarSensorSetting
+                        //                                            .SettingType.RANGE));
+                        return mApi.startEcgStreaming(mDeviceId,
+                                sensorSetting.maxSettings());
+                    }).observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(polarEcgData -> {
+//                                long offset0 = 946684800000L; // epoch to Polar
+//                                long offset1 = 599616000000L; // Polar to
+//                                // default
+//                                long ts = polarEcgData.timeStamp / 1000000;
+//                                long ts1 = ts + offset0;
+//                                long ts2 = ts + offset0 + offset1;
+//                                long now = new Date().getTime();
+//                                long reset = now - ts1;
+//                                Log.d(TAG, String.format("%15d %-8s %.2f " +
+//                                        "years", offset1, "offset1", msToYears
+//                                        (offset1)));
+//                                Log.d(TAG, String.format("%15d %-8s %.2f " +
+//                                        "years", ts, "ts", msToYears(ts)));
+//                                Log.d(TAG, String.format("%15d %-8s %.2f ",
+//                                        ts1, "ts1", msToYears(ts1)));
+//                                Log.d(TAG, String.format("%15d %-8s %.2f ",
+//                                        ts2, "ts2", msToYears(ts2)));
+//                                Log.d(TAG, String.format("%15d %-8s %.2f ",
+//                                        now, "now", msToYears(now)));
+////                                Log.d(TAG, "ts=" + ts + " ts1=" + ts1
+////                                        + " ts2=" + ts2  + " now=" + now);
+//                                Log.d(TAG,
+//                                        "ts=" + new Date(ts) + " ts1="
+//                                                + " " + new Date(ts1)
+//                                                + " reset="
+//                                                + " " + new Date(reset));
+                                if (qrs == null) {
+                                    qrs = new QRSDetection(ECGActivity.this,
+                                            mECGPlotter, mHRPlotter,
+                                            mQRSPlotter);
                                 }
+//                                Log.d(TAG, this.getClass().getSimpleName() + " streamECG"
+//                                        + " thread=" + Thread.currentThread().getName());
+//                                Log.d(TAG, this.getClass().getSimpleName() + " streamECG"
+//                                        + " nSamples=" + polarEcgData.samples.size());
+                                qrs.process(polarEcgData);
+                                // Update the elapsed time
+                                double elapsed =
+                                        mECGPlotter.getDataIndex() / 130.;
+                                mTextViewTime.setText(getString(R.string.elapsed_time, elapsed));
                             },
                             throwable -> {
                                 Log.e(TAG,
-                                        "ECG Error: " + throwable.getLocalizedMessage());
+                                        "ECG Error: "
+                                                + throwable.getLocalizedMessage(),
+                                        throwable);
+                                Utils.excMsg(ECGActivity.this, "ECG Error: ",
+                                        throwable);
                                 mEcgDisposable = null;
                             },
                             () -> Log.d(TAG, "ECG streaming complete")
@@ -903,6 +976,14 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             mEcgDisposable.dispose();
             mEcgDisposable = null;
         }
+    }
+
+    public double msToDays(long longVal) {
+        return longVal / (1000. * 60. * 60. * 24.);
+    }
+
+    public double msToYears(long longVal) {
+        return longVal / (1000. * 60. * 60. * 24. * 365.);
     }
 
     public void checkBT() {
