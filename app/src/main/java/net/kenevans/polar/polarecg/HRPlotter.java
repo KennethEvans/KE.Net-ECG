@@ -29,12 +29,15 @@ public class HRPlotter implements IConstants, IQRSConstants {
     private final ECGActivity activity;
     private final XYPlot mPlot;
 
-    private final boolean mPlotHr = true;
-    private final boolean mPlotRr = true;
+    private final boolean mPlotHr1 = true;
+    private final boolean mPlotRr1 = true;
+    private final boolean mPlotHr2 = true;
+    private final boolean mPlotRr2 = true;
     private double mPlotStartTime = Double.NaN;
     private double mLastTime = Double.NaN;
-    private final long mDomainInterval = 2 * 60000;  // 2 min
-    private final RunningMax mRunningMax = new RunningMax(250);
+    private final long mDomainInterval = 1 * 60000;  // 1 min
+    private final RunningMax mRunningMax1 = new RunningMax(50);
+    private final RunningMax mRunningMax2 = new RunningMax(50);
 
     private double mStartRrTime = Double.NEGATIVE_INFINITY;
     private double mLastRrTime;
@@ -42,15 +45,21 @@ public class HRPlotter implements IConstants, IQRSConstants {
     private double mTotalRrTime;
 
     private static final double RR_SCALE = .1;  // to 100 ms to use same axis
-    SimpleDateFormat mDateFormat = new SimpleDateFormat(
-            "HH:mm", Locale.US);
-    SimpleDateFormat mDateFormatSec = new SimpleDateFormat(
-            "HH:mm:ss", Locale.US);
+    //    private static final SimpleDateFormat X_AXIS_DATE_FORMAT = new
+    //    SimpleDateFormat(
+//            "HH:mm", Locale.US);
+    private static final SimpleDateFormat X_AXIS_DATE_FORMAT =
+            new SimpleDateFormat("HH:mm:ss", Locale.US);
 
-    private XYSeriesFormatter<XYRegionFormatter> hrFormatter;
-    private XYSeriesFormatter<XYRegionFormatter> rrFormatter;
-    private SimpleXYSeries hrSeries;
-    private SimpleXYSeries rrSeries;
+    private XYSeriesFormatter<XYRegionFormatter> hrFormatter1;
+    private XYSeriesFormatter<XYRegionFormatter> rrFormatter1;
+    private SimpleXYSeries hrSeries1;
+    private SimpleXYSeries rrSeries1;
+
+    private XYSeriesFormatter<XYRegionFormatter> hrFormatter2;
+    private XYSeriesFormatter<XYRegionFormatter> rrFormatter2;
+    private SimpleXYSeries hrSeries2;
+    private SimpleXYSeries rrSeries2;
 
     public HRPlotter(ECGActivity activity, XYPlot mPlot,
                      String title, boolean showVertices) {
@@ -68,12 +77,19 @@ public class HRPlotter implements IConstants, IQRSConstants {
     public void setupPlot() {
         Log.d(TAG, this.getClass().getSimpleName() + " setupPlot");
         Log.d(TAG, this.getClass().getSimpleName() + ": createPlot");
-        hrFormatter = new LineAndPointFormatter(Color.RED,
+        hrFormatter1 = new LineAndPointFormatter(Color.RED,
                 null, null, null);
-        hrFormatter.setLegendIconEnabled(false);
-        rrFormatter = new LineAndPointFormatter(Color.rgb(0, 153, 255),
+        hrFormatter1.setLegendIconEnabled(false);
+        rrFormatter1 = new LineAndPointFormatter(Color.rgb(0, 0x99, 0xFF),
                 null, null, null);
-        rrFormatter.setLegendIconEnabled(false);
+        rrFormatter1.setLegendIconEnabled(false);
+
+        hrFormatter2 = new LineAndPointFormatter(Color.rgb(0xFF, 0x88, 0xAA),
+                null, null, null);
+        hrFormatter2.setLegendIconEnabled(false);
+        rrFormatter2 = new LineAndPointFormatter(Color.rgb(0, 0xBF, 0xFF),
+                null, null, null);
+        rrFormatter2.setLegendIconEnabled(false);
 
         // Numbers are only used for BoundaryMode.Fixed
 //        mPlot.setRangeBoundaries(0, 0, BoundaryMode.AUTO);
@@ -90,7 +106,7 @@ public class HRPlotter implements IConstants, IQRSConstants {
         mPlot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.LEFT).
                 setFormat(new DecimalFormat("#"));
         mPlot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.BOTTOM).setFormat(new Format() {
-            private final SimpleDateFormat dateFormat = mDateFormat;
+            private final SimpleDateFormat dateFormat = X_AXIS_DATE_FORMAT;
 
             @Override
             public StringBuffer format(Object obj,
@@ -113,17 +129,29 @@ public class HRPlotter implements IConstants, IQRSConstants {
 //        mPlot.getGraph().setRangeSubGridLinePaint(new Paint(Color.rgb(90, 90,
 //                90)));
 
-        if (mPlotHr) {
-            hrSeries = new SimpleXYSeries("HR");
-            mPlot.addSeries(hrSeries, hrFormatter);
+        if (mPlotHr1) {
+            hrSeries1 = new SimpleXYSeries("HR1");
+            mPlot.addSeries(hrSeries1, hrFormatter1);
         } else {
-            hrSeries = null;
+            hrSeries1 = null;
         }
-        if (mPlotRr) {
-            rrSeries = new SimpleXYSeries("RR");
-            mPlot.addSeries(rrSeries, rrFormatter);
+        if (mPlotRr1) {
+            rrSeries1 = new SimpleXYSeries("RR1");
+            mPlot.addSeries(rrSeries1, rrFormatter1);
         } else {
-            rrSeries = null;
+            rrSeries1 = null;
+        }
+        if (mPlotHr2) {
+            hrSeries2 = new SimpleXYSeries("HR2");
+            mPlot.addSeries(hrSeries2, hrFormatter2);
+        } else {
+            hrSeries2 = null;
+        }
+        if (mPlotRr2) {
+            rrSeries2 = new SimpleXYSeries("RR2");
+            mPlot.addSeries(rrSeries2, rrFormatter2);
+        } else {
+            rrSeries2 = null;
         }
 
         // Pan and Zoom
@@ -134,43 +162,43 @@ public class HRPlotter implements IConstants, IQRSConstants {
 //        Log.d(TAG, this.getClass().getSimpleName() + ": addValues: time+"
 //                + time + " hr=" + hr
 //                + " rr=" + String.format(Locale.US, "%.1f", RR_SCALE * rr)
-//                + " hrSize=" + hrSeries.size() + " rrSize=" + hrSeries.size
+//                + " hrSize=" + hrSeries1.size() + " rrSize=" + hrSeries1.size
 //                ());
-//        if (mPlotHr) {
-//            hrSeries.addLast(time, hr);
+//        if (mPlotHr1) {
+//            hrSeries1.addLast(time, hr);
 //        }
-//        if (mPlotRr) {
-//            rrSeries.addLast(time, RR_SCALE * rr);
+//        if (mPlotRr1) {
+//            rrSeries1.addLast(time, RR_SCALE * rr);
 //        }
 //        update();
 //    }
 
-    public void addHrValue(double time, double hr) {
+    public void addHrValue1(double time, double hr) {
 //        Log.d(TAG, this.getClass().getSimpleName() + ": addHrValues: time="
-//                + mDateFormatSec.format(time) + " hr=" + hr + " hrSize=" + hrSeries.size());
-        if (!mPlotHr) return;
+//                + mDateFormatSec.format(time) + " hr=" + hr + " hrSize=" +
+//                hrSeries1.size());
+        if (!mPlotHr1) return;
         if (Double.isNaN(mPlotStartTime)) mPlotStartTime = time;
         if (Double.isNaN(mLastTime)) {
             mLastTime = time;
         } else if (time > mLastTime) {
             mLastTime = time;
         }
-        mRunningMax.add(hr);
-        hrSeries.addLast(time, hr);
+        mRunningMax1.add(hr);
+        hrSeries1.addLast(time, hr);
     }
 
-    public void addRrValues(double time, List<Integer> rrsMs) {
+    public void addRrValues1(double time, List<Integer> rrsMs) {
 //        Log.d(TAG, this.getClass().getSimpleName() + ": addRrValues: time"
 //                + mDateFormatSec.format(time) + " rrsMs.size=" + rrsMs.size()
-//                + " rrSize=" + rrSeries.size());
-        if (!mPlotRr || rrsMs.size() == 0) return;
+//                + " rrSize=" + rrSeries1.size());
+        if (!mPlotRr1 || rrsMs.size() == 0) return;
         if (Double.isNaN(mPlotStartTime)) mPlotStartTime = time;
         if (Double.isNaN(mLastTime)) {
             mLastTime = time;
         } else if (time > mLastTime) {
             mLastTime = time;
         }
-        long now = new Date().getTime();
         int nRrVals = rrsMs.size();
         double[] tVals = new double[nRrVals];
         Integer[] rrVals = new Integer[nRrVals];
@@ -182,7 +210,7 @@ public class HRPlotter implements IConstants, IQRSConstants {
         }
         // First time
         if (Double.isInfinite(mStartRrTime)) {
-            mStartRrTime = mLastRrTime = mLastUpdateTime = now - totalRR;
+            mStartRrTime = mLastRrTime = mLastUpdateTime = time - totalRR;
             mTotalRrTime = 0;
         }
         mTotalRrTime += totalRR;
@@ -207,8 +235,8 @@ public class HRPlotter implements IConstants, IQRSConstants {
             }
         }
         // Keep them from being in the future
-        if (t > now) {
-            double deltaT = t - now;
+        if (t > time) {
+            double deltaT = t - time;
             for (int i = 0; i < nRrVals; i++) {
                 tVals[i] -= deltaT;
             }
@@ -216,11 +244,35 @@ public class HRPlotter implements IConstants, IQRSConstants {
         // Add to the series
         for (int i = 0; i < nRrVals; i++) {
             rr = RR_SCALE * rrVals[i];
-            mRunningMax.add(rr);
-            rrSeries.addLast(tVals[i], rr);
+            mRunningMax1.add(rr);
+            rrSeries1.addLast(tVals[i], rr);
             mLastRrTime = tVals[i];
         }
-        mLastUpdateTime = now;
+        mLastUpdateTime = time;
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    public void addValues2(double time, double hr, double rr) {
+//        Log.d(TAG, this.getClass().getSimpleName() + ": addValues2: time="
+//                + mDateFormatSec.format(time) + " hr=" + hr + " rr="
+//                + RR_SCALE * rr);
+        if (mPlotHr2 || mPlotRr2) {
+            if (Double.isNaN(mPlotStartTime)) mPlotStartTime = time;
+            if (Double.isNaN(mLastTime)) {
+                mLastTime = time;
+            } else if (time > mLastTime) {
+                mLastTime = time;
+            }
+        }
+
+        if (mPlotHr2) {
+            mRunningMax2.add(hr);
+            hrSeries2.addLast(time, hr);
+        }
+        if (mPlotRr2) {
+            mRunningMax2.add(RR_SCALE * rr);
+            rrSeries2.addLast(time, RR_SCALE * rr);
+        }
     }
 
     /**
@@ -244,34 +296,49 @@ public class HRPlotter implements IConstants, IQRSConstants {
         sb.append("Domain Step Value=").append(mPlot.getDomainStepValue()).append(LF);
         sb.append("Graph Width=").append(mPlot.getGraph().getSize().getWidth().getValue()).append(LF);
         sb.append("Graph Height=").append(mPlot.getGraph().getSize().getHeight().getValue()).append(LF);
-        if (hrSeries != null) {
-            if (hrSeries.getxVals() != null) {
-                sb.append("hrSeries Size=").append(hrSeries.getxVals().size()).append(LF);
+        if (hrSeries1 != null) {
+            if (hrSeries1.getxVals() != null) {
+                sb.append("hrSeries1 Size=").append(hrSeries1.getxVals().size()).append(LF);
             }
         } else {
-            sb.append("hrSeries=Null").append(LF);
+            sb.append("hrSeries1=Null").append(LF);
         }
-        if (rrSeries != null) {
-            if (rrSeries.getxVals() != null) {
-                sb.append("rrSeries Size=").append(rrSeries.getxVals().size()).append(LF);
+        if (rrSeries1 != null) {
+            if (rrSeries1.getxVals() != null) {
+                sb.append("rrSeries1 Size=").append(rrSeries1.getxVals().size()).append(LF);
             }
         } else {
-            sb.append("rrSeries=Null").append(LF);
+            sb.append("rrSeries1=Null").append(LF);
+        }
+
+        if (hrSeries2 != null) {
+            if (hrSeries2.getxVals() != null) {
+                sb.append("hrSeries2 Size=").append(hrSeries2.getxVals().size()).append(LF);
+            }
+        } else {
+            sb.append("hrSeries2=Null").append(LF);
+        }
+        if (rrSeries2 != null) {
+            if (rrSeries2.getxVals() != null) {
+                sb.append("rrSeries2 Size=").append(rrSeries2.getxVals().size()).append(LF);
+            }
+        } else {
+            sb.append("rrSeries2=Null").append(LF);
         }
         return sb.toString();
     }
 
-    public String getRrInfo() {
-        double elapsed = MS_TO_SEC * (mLastRrTime - mStartRrTime);
-        double total = MS_TO_SEC * mTotalRrTime;
-        double ratio = total / elapsed;
-        return "Tot=" + String.format(Locale.US, "%.2f s", elapsed)
-                + " RR=" + String.format(Locale.US, "%.2f s", total)
-                + " (" + String.format(Locale.US, "%.2f", ratio) + ")";
-    }
+//    public String getRrInfo() {
+//        double elapsed = MS_TO_SEC * (mLastRrTime - mStartRrTime);
+//        double total = MS_TO_SEC * mTotalRrTime;
+//        double ratio = total / elapsed;
+//        return "Tot=" + String.format(Locale.US, "%.2f s", elapsed)
+//                + " RR=" + String.format(Locale.US, "%.2f s", total)
+//                + " (" + String.format(Locale.US, "%.2f", ratio) + ")";
+//    }
 
-    public void update() {
-        double max = mRunningMax.max();
+    public void setDomainRangeBoundaries() {
+        double max = Math.max(mRunningMax1.max(), mRunningMax2.max());
         if (max < 60) max = 60;
 //        Log.d(TAG, this.getClass().getSimpleName() + "update: mPlotStartTime="
 //                + mPlotStartTime + " mlastTime=" + mLastTime
@@ -282,12 +349,23 @@ public class HRPlotter implements IConstants, IQRSConstants {
                     BoundaryMode.FIXED);
         }
         mPlot.setRangeBoundaries(0, Math.ceil(max + 10), BoundaryMode.FIXED);
-        activity.runOnUiThread(() -> {
-            mPlot.redraw();
-//                Log.d(TAG, HRPlotter.this.getClass().getSimpleName()
-//                        + ": update (done)");
-        });
     }
+
+    /**
+     * Sets the domain and range boundaries and the does update.
+     */
+    public void fullUpdate() {
+        setDomainRangeBoundaries();
+        update();
+    }
+
+    /**
+     * Updates the plot. Runs on the UI thread.
+     */
+    public void update() {
+        activity.runOnUiThread(mPlot::redraw);
+    }
+
 
     public static class RunningMax {
         private final int windowSize;

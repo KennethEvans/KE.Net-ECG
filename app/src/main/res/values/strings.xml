@@ -28,7 +28,9 @@
     <string name="label_hr">Heart Rate: </string>
     <string name="label_rr">R-R: </string>
     <string name="hr_title">HR and RR vs. Time</string>
+    <string name="qrs_title">ECG vs. Time</string>
     <string name="hr_range_title">HR, /sec RR, ms/10</string>
+    <string name="qrs_range_title">QRS Peak Detection</string>
     <string name="hr_domain_title">Time</string>
 
     <!-- Utils -->

@@ -30,9 +30,13 @@ interface IQRSConstants {
      */
     int DATA_WINDOW = 20;
     /**
-     * Moving average window size.
+     * Moving average data window size.
      */
     int MOV_AVG_WINDOW = 20;
+    /**
+     * Moving average HR window size.
+     */
+    int MOV_AVG_HR_WINDOW = 5;
     /**
      * Moving average height window size.
      */

@@ -122,7 +122,7 @@
             app:paddingTop="5dp"
             app:rangeLineColor="#555555"
             app:rangeOriginLineColor="#555555"
-            app:rangeTitle="@string/hr_range_title"
+            app:rangeTitle="@string/qrs_range_title"
             app:rangeTitleTextColor="#FFFFFF"
             app:rangeTitleTextSize="14dp"
             app:renderMode="use_background_thread"

@@ -49,6 +49,12 @@ public class QRSDetection implements IConstants, IQRSConstants {
     private RunningAverage movingAverage = new RunningAverage(MOV_AVG_WINDOW);
 
     /**
+     * Moving average of the HR.
+     */
+    private RunningAverage movingAverageHr =
+            new RunningAverage(MOV_AVG_HR_WINDOW);
+
+    /**
      * Moving average of the moving average heights
      */
     private RunningAverage movingAverageHeight =
@@ -97,7 +103,7 @@ public class QRSDetection implements IConstants, IQRSConstants {
         mNSamples++;
 
         FixedSizeList<Double> input;
-        double doubleVal, peakEcgVal;
+        double doubleVal, peakEcgVal, hr, rr;
         threshold =
                 MOV_AVG_HEIGHT_THRESHOLD_FACTOR * movingAverageHeight.average();
         curEcg.add(ecg);
@@ -151,18 +157,32 @@ public class QRSDetection implements IConstants, IQRSConstants {
             mScoreStart = i;
             mScoring = true;
         }
-        if (!mScoring && mScoreEnd == i) {
+        if (!mScoring && mScoreEnd == i && mMaxIndex != -1) {
             // End of interval, process the score
-            if (mMaxIndex > -1) {
-                peakEcgVal = ecgVals.get(mMaxIndex);
-                mPeaks.add(peakEcgVal);
-                mPeakIndices.add(mMaxIndex);
-                mQRSPlotter.addPeakValue(mMaxIndex, peakEcgVal);
-                // Recalculate the threshold
-                movingAverageHeight.add(mMaxAvgHeight);
-                threshold = MOV_AVG_HEIGHT_THRESHOLD_FACTOR
-                        * movingAverageHeight.average();
+            peakEcgVal = ecgVals.get(mMaxIndex);
+            mPeaks.add(peakEcgVal);
+            mPeakIndices.add(mMaxIndex);
+            // Do HR/RR plot
+            if (mPeaks.size() > 1) {
+                rr = 1000 / FS * (mMaxIndex - mPeakIndices.get(mPeaks.size() - 2));
+                hr = 60000. / rr;
+                if (!Double.isInfinite(hr)) {
+                    movingAverageHr.add(hr);
+                    // Wait to start plotting until HR average is well defined
+                    if (movingAverageHr.size() >= MOV_AVG_HR_WINDOW) {
+                        mHRPlotter.addValues2(mStartTime + 1000 * mMaxIndex / FS,
+                                movingAverageHr.average(),
+                                (double) rr);
+                        mHRPlotter.fullUpdate();
+                    }
+                }
             }
+            // Do QRS plot
+            mQRSPlotter.addPeakValue(mMaxIndex, peakEcgVal);
+            // Recalculate the threshold
+            movingAverageHeight.add(mMaxAvgHeight);
+            threshold = MOV_AVG_HEIGHT_THRESHOLD_FACTOR
+                    * movingAverageHeight.average();
             mMaxIndex = -1;
         }
         if (mScoring) {
