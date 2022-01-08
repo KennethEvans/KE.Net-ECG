@@ -33,6 +33,7 @@ import android.widget.Toast;
 import com.androidplot.Plot;
 import com.androidplot.PlotListener;
 import com.androidplot.xy.PanZoom;
+import com.androidplot.xy.RectRegion;
 import com.androidplot.xy.XYPlot;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -98,7 +99,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     /***
      * Whether to save as CSV, Plot, or both.
      */
-    private enum SAVE_TYPE {DATA, PLOT, BOTH}
+    private enum SAVE_TYPE {DATA, PLOT, BOTH, DEVICE_HR, QRS_HR}
 
     TextView mTextViewHR, mTextViewFW, mTextViewTime;
     private PolarBleApi mApi;
@@ -299,7 +300,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             mMenu.findItem(R.id.save_data).setVisible(false);
             mMenu.findItem(R.id.save_plot).setVisible(false);
             mMenu.findItem(R.id.save_both).setVisible(false);
-            mMenu.findItem(R.id.save_both).setVisible(true);
+            mMenu.findItem(R.id.save_device_data).setVisible(false);
+            mMenu.findItem(R.id.save_qrs_data).setVisible(false);
             mMenu.findItem(R.id.device_id).setVisible(true);
         } else if (mPlaying) {
             mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
@@ -309,6 +311,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             mMenu.findItem(R.id.save_data).setVisible(false);
             mMenu.findItem(R.id.save_plot).setVisible(false);
             mMenu.findItem(R.id.save_both).setVisible(false);
+            mMenu.findItem(R.id.save_device_data).setVisible(false);
+            mMenu.findItem(R.id.save_qrs_data).setVisible(false);
         } else {
             mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
                     getDrawable(getResources(),
@@ -317,6 +321,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             mMenu.findItem(R.id.save_data).setVisible(true);
             mMenu.findItem(R.id.save_plot).setVisible(true);
             mMenu.findItem(R.id.save_both).setVisible(true);
+            mMenu.findItem(R.id.save_device_data).setVisible(true);
+            mMenu.findItem(R.id.save_qrs_data).setVisible(true);
         }
         return true;
     }
@@ -345,6 +351,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 mMenu.findItem(R.id.save_data).setVisible(true);
                 mMenu.findItem(R.id.save_plot).setVisible(true);
                 mMenu.findItem(R.id.save_both).setVisible(true);
+                mMenu.findItem(R.id.save_device_data).setVisible(true);
+                mMenu.findItem(R.id.save_qrs_data).setVisible(true);
             } else {
                 // Turn it on
                 mStopHR = mTextViewHR.getText().toString();
@@ -367,16 +375,24 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 mMenu.findItem(R.id.save_data).setVisible(false);
                 mMenu.findItem(R.id.save_plot).setVisible(false);
                 mMenu.findItem(R.id.save_both).setVisible(false);
+                mMenu.findItem(R.id.save_device_data).setVisible(false);
+                mMenu.findItem(R.id.save_qrs_data).setVisible(false);
             }
             return true;
         } else if (id == R.id.save_plot) {
-            saveData(SAVE_TYPE.PLOT);
+            saveDataWithNote(SAVE_TYPE.PLOT);
             return true;
         } else if (id == R.id.save_data) {
-            saveData(SAVE_TYPE.DATA);
+            saveDataWithNote(SAVE_TYPE.DATA);
             return true;
         } else if (id == R.id.save_both) {
-            saveData(SAVE_TYPE.BOTH);
+            saveDataWithNote(SAVE_TYPE.BOTH);
+            return true;
+        } else if (id == R.id.save_device_data) {
+            doSaveSessionData(SAVE_TYPE.DEVICE_HR);
+            return true;
+        } else if (id == R.id.save_qrs_data) {
+            doSaveSessionData(SAVE_TYPE.QRS_HR);
             return true;
         } else if (id == R.id.info) {
             info();
@@ -635,11 +651,11 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
 
     /**
      * Save the current samples as a file.  Prompts for a note, then calls
-     * finishSaveData.
+     * the appropriate doSave method.
      *
      * @param saveType The SAVE_TYPE.
      */
-    private void saveData(final SAVE_TYPE saveType) {
+    private void saveDataWithNote(final SAVE_TYPE saveType) {
         String msg;
         String state = Environment.getExternalStorageState();
         if (!Environment.MEDIA_MOUNTED.equals(state)) {
@@ -672,6 +688,10 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                         case BOTH:
                             doSaveData(input.getText().toString());
                             doSavePlot(input.getText().toString());
+                            break;
+                        case DEVICE_HR:
+                        case QRS_HR:
+                            doSaveSessionData(saveType);
                             break;
                     }
                 });
@@ -795,6 +815,69 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             }
         } catch (IOException ex) {
             msg = "Error writing CSV file";
+            Log.e(TAG, msg);
+            Log.e(TAG, Log.getStackTraceString(ex));
+            Utils.excMsg(this, msg, ex);
+        }
+    }
+
+    /**
+     * Finishes the saveData.
+     *
+     * @param saveType The saveType (either DEVICE_HR or QRS_HR).
+     */
+    private void doSaveSessionData(SAVE_TYPE saveType) {
+        SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        String treeUriStr = prefs.getString(PREF_TREE_URI, null);
+        if (treeUriStr == null) {
+            Utils.errMsg(this, "There is no data directory set");
+            return;
+        }
+        String msg;
+        String format = "yyyy-MM-dd_HH-mm";
+        SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
+        String fileName;
+        List<HRPlotter.HrRrData> dataList;
+        try {
+            if (saveType == SAVE_TYPE.DEVICE_HR) {
+                fileName = "PolarECG-DeviceHR-" + df.format(mStopTime) + ".csv";
+                dataList = mHRPlotter.mHrRrList1;
+            } else if (saveType == SAVE_TYPE.QRS_HR) {
+                fileName = "PolarECG-QRSHR-" + df.format(mStopTime) + ".csv";
+                dataList = mHRPlotter.mHrRrList2;
+            } else {
+                Utils.errMsg(this,
+                        "Invalid saveType (" + saveType + "0 in " +
+                                "doSaveSessionData");
+                return;
+            }
+
+            Uri treeUri = Uri.parse(treeUriStr);
+            String treeDocumentId =
+                    DocumentsContract.getTreeDocumentId(treeUri);
+            Uri docTreeUri =
+                    DocumentsContract.buildDocumentUriUsingTree(treeUri,
+                            treeDocumentId);
+            ContentResolver resolver = this.getContentResolver();
+            ParcelFileDescriptor pfd;
+            Uri docUri = DocumentsContract.createDocument(resolver, docTreeUri,
+                    "text/csv", fileName);
+            pfd = getContentResolver().
+                    openFileDescriptor(docUri, "w");
+            try (FileWriter writer = new FileWriter(pfd.getFileDescriptor());
+                 PrintWriter out = new PrintWriter((writer))) {
+                // Write header
+                // Write samples
+                for(HRPlotter.HrRrData data : dataList) {
+                    out.write(data.getCVSString() + "\n");
+                }
+                out.flush();
+                msg = "Wrote " + docUri.getLastPathSegment();
+                Log.d(TAG, msg);
+                Utils.infoMsg(this, msg);
+            }
+        } catch (IOException ex) {
+            msg = "Error writing " + saveType + " CSV file";
             Log.e(TAG, msg);
             Log.e(TAG, Log.getStackTraceString(ex));
             Utils.excMsg(this, msg, ex);

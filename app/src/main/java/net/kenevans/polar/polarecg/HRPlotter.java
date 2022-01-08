@@ -6,6 +6,7 @@ import android.util.Log;
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
 import com.androidplot.xy.PanZoom;
+import com.androidplot.xy.RectRegion;
 import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
@@ -64,6 +65,9 @@ public class HRPlotter implements IConstants, IQRSConstants {
     private XYSeriesFormatter<XYRegionFormatter> rrFormatter2;
     private SimpleXYSeries hrSeries2;
     private SimpleXYSeries rrSeries2;
+
+    public List<HrRrData> mHrRrList1 = new ArrayList<>();
+    public List<HrRrData> mHrRrList2 = new ArrayList<>();
 
     public HRPlotter(ECGActivity activity, XYPlot mPlot,
                      String title, boolean showVertices) {
@@ -162,27 +166,28 @@ public class HRPlotter implements IConstants, IQRSConstants {
         PanZoom.attach(mPlot, PanZoom.Pan.BOTH, PanZoom.Zoom.STRETCH_BOTH);
     }
 
-//    public void addValues(long time, double hr, double rr) {
-//        Log.d(TAG, this.getClass().getSimpleName() + ": addValues: time+"
-//                + time + " hr=" + hr
-//                + " rr=" + String.format(Locale.US, "%.1f", RR_SCALE * rr)
-//                + " hrSize=" + hrSeries1.size() + " rrSize=" + hrSeries1.size
-//                ());
-//        if (mPlotHr1) {
-//            hrSeries1.addLast(time, hr);
-//        }
-//        if (mPlotRr1) {
-//            rrSeries1.addLast(time, RR_SCALE * rr);
-//        }
-//        update();
-//    }
-
     @SuppressWarnings("ConstantConditions")
     public void addValues1(double time, double hr, List<Integer> rrsMs) {
 //        Log.d(TAG, this.getClass().getSimpleName() + ": addHrValues: time="
 //                + mDateFormatSec.format(time) + " hr=" + hr + " hrSize=" +
 //                hrSeries1.size());
         if (mPlotHr1 || mPlotRr1) {
+            mHrRrList1.add(new HrRrData(time, hr, rrsMs));
+//            StringBuilder sb = new StringBuilder();
+//            sb.append("HRPlotter: addValues1");
+//            sb.append(" time=");
+//            sb.append(X_AXIS_DATE_FORMAT.format(new Date(Math.round(time))));
+//            sb.append(" hr=").append(Math.round(hr)).append(" rr=");
+//            for (int rr : rrsMs) {
+//                sb.append(rr).append(" ");
+//            }
+//            Log.d(TAG, sb.toString());
+            if (Double.isNaN(mPlotStartTime)) mPlotStartTime = time;
+            if (Double.isNaN(mLastTime)) {
+                mLastTime = time;
+            } else if (time > mLastTime) {
+                mLastTime = time;
+            }
             if (Double.isNaN(mPlotStartTime)) mPlotStartTime = time;
             if (Double.isNaN(mLastTime)) {
                 mLastTime = time;
@@ -258,6 +263,11 @@ public class HRPlotter implements IConstants, IQRSConstants {
 //                + mDateFormatSec.format(time) + " hr=" + hr + " rr="
 //                + RR_SCALE * rr);
         if (mPlotHr2 || mPlotRr2) {
+            mHrRrList2.add(new HrRrData(time, hr, rr));
+//            Log.d(TAG, "HRPlotter: addValues2"
+//                    + " time=" + X_AXIS_DATE_FORMAT.format(new Date(Math.round(time)))
+//                    + " hr=" + Math.round(hr)
+//                    + " rr=" + Math.round(rr));
             if (Double.isNaN(mPlotStartTime)) mPlotStartTime = time;
             if (Double.isNaN(mLastTime)) {
                 mLastTime = time;
@@ -350,6 +360,15 @@ public class HRPlotter implements IConstants, IQRSConstants {
                     BoundaryMode.FIXED);
         }
         mPlot.setRangeBoundaries(0, Math.ceil(max + 10), BoundaryMode.FIXED);
+//        RectRegion rgn= mPlot.getOuterLimits();
+//        Log.d(TAG,"OuterLimits="  + rgn.getMinX() + "," + rgn.getMaxX());
+//        mPlot.getOuterLimits().set(mPlotStartTime, mLastTime,
+//                0, Math.ceil(max + 10));
+    }
+
+    public void setOuterLimits() {
+        mPlot.getOuterLimits().setMinX(mPlotStartTime);
+        mPlot.getOuterLimits().setMaxX(mLastTime);
     }
 
     /**
@@ -367,6 +386,35 @@ public class HRPlotter implements IConstants, IQRSConstants {
         activity.runOnUiThread(mPlot::redraw);
     }
 
+    public static class HrRrData {
+        // THis is the same formatter as sessionSaveFormatter in Bluetooth
+        // Cardiac Monitor.
+        private static final SimpleDateFormat sdf = new SimpleDateFormat(
+                "yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
+        private String time;
+        private String hr;
+        private String rr;
+
+        public HrRrData(double time, double hr, List<Integer> rrsMs) {
+            this.time = sdf.format(new Date(Math.round(time)));
+            this.hr = String.format(Locale.US, "%.0f", hr);
+            StringBuilder sb = new StringBuilder();
+            for (Integer rr : rrsMs) {
+                sb.append(rr);
+            }
+            this.rr = sb.toString().trim();
+        }
+
+        public HrRrData(double time, double hr, double rr) {
+            this.time = sdf.format(new Date(Math.round(time)));
+            this.hr = String.format(Locale.US, "%.0f", hr);
+            this.rr = String.format(Locale.US, "%.0f", rr);
+        }
+
+        public String getCVSString() {
+            return String.format("%s,%s,%s", time, hr, rr);
+        }
+    }
 
     public static class RunningMax {
         private final int windowSize;

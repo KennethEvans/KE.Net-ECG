@@ -19,6 +19,8 @@
     <string name="save_data_item">Save Data</string>
     <string name="save_plot_item">Save Plot</string>
     <string name="save_both_item">Save Both</string>
+    <string name="save_device_data_item">Save Device HR Data</string>
+    <string name="save_qrs_data_item">Save Calculated HR Data</string>
     <string name="choose_data_directory_item">Set Data Directory</string>
     <string name="info_item">Info</string>
     <string name="device_id_item">Set Device ID</string>
