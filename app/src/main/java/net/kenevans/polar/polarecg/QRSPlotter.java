@@ -6,6 +6,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 
+import com.androidplot.util.PixelUtils;
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
 import com.androidplot.xy.SimpleXYSeries;
@@ -18,7 +19,7 @@ import com.androidplot.xy.XYSeriesFormatter;
 @SuppressWarnings("WeakerAccess")
 public class QRSPlotter implements IConstants, IQRSConstants {
     private final ECGActivity activity;
-    private final XYPlot mPlot;
+    private XYPlot mPlot;
 
     private final XYSeriesFormatter<XYRegionFormatter> mFormatter1;
     private final SimpleXYSeries mSeries1;
@@ -34,32 +35,37 @@ public class QRSPlotter implements IConstants, IQRSConstants {
      */
     private long mDataIndex;
 
-    public QRSPlotter(ECGActivity activity, XYPlot mPlot, String title) {
-        Log.d(TAG, this.getClass().getSimpleName() + " ECGPlotter CTOR");
+    public QRSPlotter(ECGActivity activity, XYPlot plot, String title) {
+        Log.d(TAG, this.getClass().getSimpleName() + " QRSPlotter CTOR");
         // This is the activity, needed for resources
         this.activity = activity;
-        this.mPlot = mPlot;
+        this.mPlot = plot;
         this.mDataIndex = 0;
 
         mFormatter1 = new LineAndPointFormatter(Color.rgb(0, 153, 255),
                 null, null, null);
         mFormatter1.setLegendIconEnabled(false);
         mSeries1 = new SimpleXYSeries(title);
+        mPlot.addSeries(mSeries1, mFormatter1);
 
         mFormatter2 = new LineAndPointFormatter(Color.YELLOW,
                 null, null, null);
         mFormatter2.setLegendIconEnabled(false);
         mSeries2 = new SimpleXYSeries(title);
+        mPlot.addSeries(mSeries2, mFormatter2);
 
         mFormatter3 = new LineAndPointFormatter(Color.GREEN,
                 null, null, null);
         mFormatter3.setLegendIconEnabled(false);
         mSeries3 = new SimpleXYSeries(title);
+        mPlot.addSeries(mSeries3, mFormatter3);
 
         mFormatter4 = new LineAndPointFormatter(null,
                 Color.RED, null, null);
         mFormatter4.setLegendIconEnabled(false);
         mSeries4 = new SimpleXYSeries(title);
+        mPlot.addSeries(mSeries4, mFormatter4);
+
         setupPlot();
     }
 
@@ -70,33 +76,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
     public void setupPlot() {
         Log.d(TAG, this.getClass().getSimpleName() + " setupPlot");
         if (mPlot.getVisibility() == View.GONE) return;
-//        DisplayMetrics displayMetrics = this.getResources()
-//        .getDisplayMetrics();
-//        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
-//        float dpWidth = displayMetrics.widthPixels / displayMetrics.density;
-//        Log.d(TAG, "dpWidth=" + dpWidth + " dpHeight=" + dpHeight);
-//        Log.d(TAG, "widthPixels=" + displayMetrics.widthPixels +
-//                " heightPixels=" + displayMetrics.heightPixels);
-//        Log.d(TAG, "density=" + displayMetrics.density);
-//        Log.d(TAG, "10dp=" + 10 / displayMetrics.density + " pixels");
-//
-//        Log.d(TAG, "plotWidth=" + mPlot.getWidth() +
-//                " plotHeight=" + mPlot.getHeight());
-//
-//        RectF widgetRect = mPlot.getGraph().getWidgetDimensions().canvasRect;
-//        Log.d(TAG,
-//                "widgetRect LRTB=" + widgetRect.left + "," + widgetRect
-//                .right +
-//                        "," + widgetRect.top + "," + widgetRect.bottom);
-//        Log.d(TAG, "widgetRect width=" + (widgetRect.right - widgetRect
-//        .left) +
-//                " height=" + (widgetRect.bottom - widgetRect.top));
-//
-//        RectF gridRect = mPlot.getGraph().getGridRect();
-//        Log.d(TAG, "gridRect LRTB=" + gridRect.left + "," + gridRect.right +
-//                "," + gridRect.top + "," + gridRect.bottom);
-//        Log.d(TAG, "gridRect width=" + (gridRect.right - gridRect.left) +
-//                " height=" + (gridRect.bottom - gridRect.top));
 
         // Calculate the range limits to make the blocks be square
         // Using .5 mV and nLarge / samplingRate for total grid size
@@ -108,24 +87,27 @@ public class QRSPlotter implements IConstants, IQRSConstants {
                         N_LARGE / (gridRect.right - gridRect.left);
         // Round it to one decimal point
         rMax = Math.round(rMax * 10) / 10.;
-        Log.d(TAG, "    rMax = " + rMax);
-        Log.d(TAG, "    gridRect LRTB=" + gridRect.left + "," + gridRect.right +
-                "," + gridRect.top + "," + gridRect.bottom);
-        Log.d(TAG, "    gridRect width=" + (gridRect.right - gridRect.left) +
-                " height=" + (gridRect.bottom - gridRect.top));
-        DisplayMetrics displayMetrics = activity.getResources()
-                .getDisplayMetrics();
-        Log.d(TAG, "    display widthPixels=" + displayMetrics.widthPixels +
-                " heightPixels=" + displayMetrics.heightPixels);
+//        Log.d(TAG, "    rMax = " + rMax);
+//        Log.d(TAG, "    gridRect LRTB=" + gridRect.left + "," + gridRect.right +
+//                "," + gridRect.top + "," + gridRect.bottom);
+//        Log.d(TAG, "    gridRect width=" + (gridRect.right - gridRect.left) +
+//                " height=" + (gridRect.bottom - gridRect.top));
+//        DisplayMetrics displayMetrics = activity.getResources()
+//                .getDisplayMetrics();
+//        Log.d(TAG, "    display widthPixels=" + displayMetrics.widthPixels +
+//                " heightPixels=" + displayMetrics.heightPixels);
 
-        mPlot.addSeries(mSeries1, mFormatter1);
-        mPlot.addSeries(mSeries2, mFormatter2);
-        mPlot.addSeries(mSeries3, mFormatter3);
-        mPlot.addSeries(mSeries4, mFormatter4);
         mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
         // Set the range block to be .1 mV so a large block will be .5 mV
         mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .5);
-//        mPlot.setLinesPerRangeLabel(5);
+        mPlot.setLinesPerRangeLabel(5);
+        // Make it be centered
+        mPlot.setUserRangeOrigin(0.);
+        // Make the x axis visible
+        int color = mPlot.getGraph().getRangeGridLinePaint().getColor();
+        mPlot.getGraph().getRangeOriginLinePaint().setColor(color);
+        mPlot.getGraph().getRangeOriginLinePaint().setStrokeWidth(
+                PixelUtils.dpToPix(1.5f));
         mPlot.setDomainBoundaries(-N_ECG_PLOT_POINTS, 0, BoundaryMode.FIXED);
         // Set the domain block to be .2 * N_LARGE so large block will be
         // nLarge samples
@@ -134,17 +116,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
 //        mPlot.setLinesPerDomainLabel(5);
 
         mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
-
-        // These don't work
-//        mPlot.getTitle().position(0, HorizontalPositioning
-//        .ABSOLUTE_FROM_RIGHT,
-//                0,    VerticalPositioning.ABSOLUTE_FROM_TOP, Anchor
-//                .RIGHT_TOP);
-//        mPlot.getTitle().setAnchor(Anchor.BOTTOM_MIDDLE);
-//        mPlot.getTitle().setMarginTop(200);
-//        mPlot.getTitle().setPaddingTop(200);
-
-//        mPlot.setRenderMode(Plot.RenderMode.USE_BACKGROUND_THREAD);
 
         // Update the plot
         update();
@@ -243,12 +214,24 @@ public class QRSPlotter implements IConstants, IQRSConstants {
     }
 
     /**
-     * Clears the plot and resets dataIndex
+     * Clears the plot and resets dataIndex.
      */
     public void clear() {
         if (mPlot.getVisibility() == View.GONE) return;
         mDataIndex = 0;
         mSeries1.clear();
+        mSeries2.clear();
+        mSeries3.clear();
+        mSeries4.clear();
         update();
+    }
+
+    public void resetPlot(XYPlot plot) {
+        mPlot = plot;
+        mPlot.clear();
+        mPlot.addSeries(mSeries1, mFormatter1);
+        mPlot.addSeries(mSeries2, mFormatter2);
+        mPlot.addSeries(mSeries3, mFormatter3);
+        mPlot.addSeries(mSeries4, mFormatter4);
     }
 }

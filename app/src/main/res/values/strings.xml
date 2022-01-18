@@ -18,7 +18,8 @@
     <string name="stop_item">Stop</string>
     <string name="save_data_item">Save Data</string>
     <string name="save_plot_item">Save Plot</string>
-    <string name="save_both_item">Save Both</string>
+    <string name="save_both_item">Save Data &amp; Plot</string>
+    <string name="save_all_item">Save All</string>
     <string name="save_device_data_item">Save Device HR Data</string>
     <string name="save_qrs_data_item">Save Calculated HR Data</string>
     <string name="choose_data_directory_item">Set Data Directory</string>
@@ -33,7 +34,8 @@
     <string name="qrs_title">ECG vs. Time</string>
     <string name="hr_range_title">HR, /sec RR, ms/10</string>
     <string name="qrs_range_title">QRS Peak Detection</string>
-    <string name="hr_domain_title">Time</string>
+    <string name="hr_domain_title_time">Time</string>
+    <string name="hr_domain_title_sample">Sample</string>
 
     <!-- Utils -->
     <string name="ok">OK</string>

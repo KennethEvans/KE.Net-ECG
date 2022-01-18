@@ -17,6 +17,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.text.InputType;
@@ -33,7 +34,6 @@ import android.widget.Toast;
 import com.androidplot.Plot;
 import com.androidplot.PlotListener;
 import com.androidplot.xy.PanZoom;
-import com.androidplot.xy.RectRegion;
 import com.androidplot.xy.XYPlot;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -82,6 +82,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     private static final int MAX_DEVICES = 3;
     // Currently the sampling rate is fixed at 130
     private static final int mSamplingRate = 130;
+    private QRSDetection mQRS;
     List<DeviceInfo> mMruDevices;
     private XYPlot mECGPlot;
     private XYPlot mHRPlot;
@@ -89,9 +90,12 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     private ECGPlotter mECGPlotter;
     private HRPlotter mHRPlotter;
     private QRSPlotter mQRSPlotter;
-    private PlotListener mEcgPlotListener;
-    private boolean mOrientationChanged = false;
-    private QRSDetection qrs;
+
+    private PlotListener mECGPlotListener;
+    private PlotListener mQRSPlotListener;
+    public boolean mOrientationChanged = false;
+    public boolean mOrientationChangedECG = false;
+    public boolean mOrientationChangedQRS = false;
 
     //    public boolean useQRSPlotter = true;
     public boolean mUseQRSPlot = true;
@@ -99,9 +103,10 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     /***
      * Whether to save as CSV, Plot, or both.
      */
-    private enum SAVE_TYPE {DATA, PLOT, BOTH, DEVICE_HR, QRS_HR}
+    private enum SaveType {DATA, PLOT, BOTH, DEVICE_HR, QRS_HR, ALL}
 
-    TextView mTextViewHR, mTextViewFW, mTextViewTime;
+    TextView mTextViewHR, mTextViewInfo, mTextViewTime;
+    ConstraintLayout mLayoutTop, mLayoutAnalysis, mLayoutEcg;
     private PolarBleApi mApi;
     private Disposable mEcgDisposable;
     private boolean mPlaying;
@@ -186,8 +191,11 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         Log.d(TAG, this.getClass().getSimpleName() + " onCreate");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_ecg);
-        mTextViewHR = findViewById(R.id.info);
-        mTextViewFW = findViewById(R.id.fw);
+        mLayoutTop = findViewById(R.id.top);
+        mLayoutEcg = findViewById(R.id.ecg);
+        mLayoutAnalysis = findViewById(R.id.analysis);
+        mTextViewHR = findViewById(R.id.hr);
+        mTextViewInfo = findViewById(R.id.info);
         mTextViewTime = findViewById(R.id.time);
         mECGPlot = findViewById(R.id.ecgplot);
         mHRPlot = findViewById(R.id.hrplot);
@@ -196,7 +204,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         // Make the QRS plot and it's layout Gone
         if (!mUseQRSPlot) {
             mQRSPlot.setVisibility(View.GONE);
-            ConstraintLayout constraintLayout = findViewById(R.id.qrs);
+            ConstraintLayout constraintLayout = findViewById(R.id.analysis);
             constraintLayout.setVisibility(View.GONE);
 //            // Reset the weights
 //            constraintLayout = findViewById(R.id.top);
@@ -364,6 +372,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 // Clear the plot
                 mECGPlotter.clear();
                 mQRSPlotter.clear();
+                mHRPlotter.clear();
                 if (mEcgDisposable == null) {
                     // Turns it on
                     streamECG();
@@ -380,21 +389,24 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             }
             return true;
         } else if (id == R.id.save_plot) {
-            saveDataWithNote(SAVE_TYPE.PLOT);
+            saveDataWithNote(SaveType.PLOT);
             return true;
         } else if (id == R.id.save_data) {
-            saveDataWithNote(SAVE_TYPE.DATA);
+            saveDataWithNote(SaveType.DATA);
             return true;
         } else if (id == R.id.save_both) {
-            saveDataWithNote(SAVE_TYPE.BOTH);
+            saveDataWithNote(SaveType.BOTH);
+            return true;
+        } else if (id == R.id.save_all) {
+            saveDataWithNote(SaveType.ALL);
             return true;
         } else if (id == R.id.save_device_data) {
-            doSaveSessionData(SAVE_TYPE.DEVICE_HR);
+            doSaveSessionData(SaveType.DEVICE_HR);
             return true;
         } else if (id == R.id.save_qrs_data) {
-            doSaveSessionData(SAVE_TYPE.QRS_HR);
+            doSaveSessionData(SaveType.QRS_HR);
             return true;
-        } else if (id == R.id.info) {
+        } else if (id == R.id.hr) {
             info();
             return true;
         } else if (id == R.id.device_id) {
@@ -404,7 +416,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             chooseDataDirectory();
             return true;
         }
-        return false;
+            return false;
     }
 
     /**
@@ -422,19 +434,211 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         Log.v(TAG, this.getClass().getSimpleName() +
-                " onConfigurationChanged");
+                " onConfigurationChanged: "
+                + (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE ?
+                "Landscape" : "Portrait")
+                + " time=" + ECGPlotter.sdfshort.format(new Date())
+        );
         super.onConfigurationChanged(newConfig);
+        int orientation = newConfig.orientation;
+        mOrientationChanged = mOrientationChangedECG =
+                mOrientationChangedQRS = true;
 
-        if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            Log.v(TAG, "    Landscape");
-        } else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT) {
-            Log.v(TAG, "    Portrait");
-        }
-        // Cannot do this now as the screen changes have only been dispatched
-        mOrientationChanged = true;
-        mECGPlot.post(() -> mECGPlot.redraw());
+        ConstraintLayout topOld = mLayoutTop;
+        ConstraintLayout ecgOld = mLayoutEcg;
+        ConstraintLayout analysisOld = mLayoutAnalysis;
+        XYPlot ecgplotOld = mECGPlot;
+        XYPlot qrsplotOld = mQRSPlot;
+        XYPlot hrplotOld = mHRPlot;
+        TextView hrOld = mTextViewHR;
+        TextView timeOld = mTextViewTime;
+        TextView infoOld = mTextViewInfo;
+
+        // At this point the content view has not been changed. Change it.
+        // It will use the one appropriate to the new orientation.
+        setContentView(R.layout.activity_ecg);
+
+        // At this point the new layouts should be correct but they have
+        // undefined Views.  We need to replace the views with the old ones.
+        ConstraintLayout topNew = findViewById(R.id.top);
+        ConstraintLayout ecgNew = findViewById(R.id.ecg);
+        ConstraintLayout analysisNew = findViewById(R.id.analysis);
+        XYPlot ecgplotNew = findViewById(R.id.ecgplot);
+        XYPlot qrsplotNew = findViewById(R.id.qrsplot);
+        XYPlot hrplotNew = findViewById(R.id.hrplot);
+        TextView hrNew = findViewById(R.id.hr);
+        TextView timeNew = findViewById(R.id.time);
+        TextView infoNew = findViewById(R.id.info);
+
+        // ecg
+        replaceView(ecgplotOld, ecgplotNew, ecgOld, ecgNew);
+        ecgplotNew = findViewById(R.id.ecgplot);
+        replaceView(hrOld, hrNew, ecgOld, ecgNew);
+        hrNew = findViewById(R.id.hr);
+        replaceView(infoOld, infoNew, ecgOld, ecgNew);
+        infoNew = findViewById(R.id.info);
+        replaceView(timeOld, timeNew, ecgOld, ecgNew);
+        timeNew = findViewById(R.id.time);
+
+        // analysis
+        replaceView(qrsplotOld, qrsplotNew, analysisOld, analysisNew);
+        qrsplotNew = findViewById(R.id.qrsplot);
+        replaceView(hrplotOld, hrplotNew, analysisOld, analysisNew);
+        hrplotNew = findViewById(R.id.hrplot);
+
+        Log.d(TAG, "after replaceView calls: time="
+                + ECGPlotter.sdfshort.format(new Date()));
+
+        // Get the new ids from the resources
+        // (These should the same as the new values)
+        mLayoutTop = findViewById(R.id.top);
+        mLayoutEcg = findViewById(R.id.ecg);
+        mLayoutAnalysis = findViewById(R.id.analysis);
+        mECGPlot = findViewById(R.id.ecgplot);
+        mQRSPlot = findViewById(R.id.qrsplot);
+        mHRPlot = findViewById(R.id.hrplot);
+        mTextViewHR = findViewById(R.id.hr);
+        mTextViewTime = findViewById(R.id.time);
+        mTextViewInfo = findViewById(R.id.info);
+//        Log.d(TAG, "After mLayoutEcg=" + getHashCode(mLayoutEcg)
+//                +  " mLayoutAnalysis=" + getHashCode(mLayoutAnalysis)
+//                + " mTextViewHR=" + getHashCode(mTextViewHR)
+//                + " mTextViewTime=" + getHashCode(mTextViewTime)
+//                + " mLayoutTop=" + getHashCode(mLayoutTop)
+//        );
+//        Log.d(TAG, "After: ecgplot: old=" + getHashCode(ecgOld)
+//                +  " new=" + getHashCode(ecgplotNew)
+//                +  " final=" + getHashCode(mECGPlot)
+//        );
+//        Log.d(TAG, "After: qrsplot: old=" + getHashCode(qrsplotOld)
+//                +  " new=" + getHashCode(qrsplotNew)
+//                +  " final=" + getHashCode(mQRSPlot)
+//        );
+//        Log.d(TAG, "After: hrplot: old=" + getHashCode(hrplotOld)
+//                +  " new=" + getHashCode(hrplotNew)
+//                +  " final=" + getHashCode(mHRPlot)
+//        );
+
+//        // Mark the plots as needing to be laid out
+//        mECGPlot.invalidate();
+//        mECGPlot.requestLayout();
+//        mQRSPlot.invalidate();
+//        mQRSPlot.requestLayout();
+//        mHRPlot.invalidate();
+//        mHRPlot.requestLayout();
+
+        // Set the plots invisible to avid flashing
+        mECGPlot.setVisibility(View.INVISIBLE);
+
+        // Update the mPlot instances in the plotters
+        mECGPlotter.resetPlotInstance(mECGPlot);
+        mQRSPlotter.resetPlot(mQRSPlot);
+        mHRPlotter.resetPlot(mHRPlot);
+
+        Log.d(TAG, "after resetPlotInstance calls, before handler calls: time="
+                + ECGPlotter.sdfshort.format(new Date()));
+
+
+//        Log.d(TAG, "setupPlot 1 started: time="
+//                + ECGPlotter.sdfshort.format(new Date()));
+//        mECGPlotter.setupPlot();
+
+        // Post a Runnable to have plots to be setup again in 1 sec
+        final Handler handler = new Handler();
+//        handler.postDelayed(() -> {
+//            Log.d(TAG, "setupPlot 2 started: time="
+//                    + ECGPlotter.sdfshort.format(new Date()));
+//            mECGPlotter.setupPlot();
+//            mQRSPlotter.setupPlot();
+//            mHRPlotter.setupPlot();
+//        }, 1);
+        handler.postDelayed(() -> {
+            Log.d(TAG, "setupPlot 3 started: time="
+                    + ECGPlotter.sdfshort.format(new Date()));
+            mECGPlotter.setupPlot();
+            mQRSPlotter.setupPlot();
+            mHRPlotter.setupPlot();
+            handler.postDelayed(() -> {
+                Log.d(TAG, "reset mOrientationChanged: time="
+                        + ECGPlotter.sdfshort.format(new Date()));
+                mOrientationChanged = mOrientationChangedECG = mOrientationChangedQRS = false;
+                mECGPlot.setVisibility(View.VISIBLE);
+            }, 1000);
+        }, 1000);
     }
 
+    /**
+     * Replaces the View in the new Layout with the View from the old Layout.
+     *
+     * @param oldView   The old view.
+     * @param newView   The new view.
+     * @param oldLayout The old Layout. (The View has to be unparented.)
+     * @param newLayout Ghe new Layout.
+     */
+    private void replaceView(View oldView, View newView,
+                             ConstraintLayout oldLayout,
+                             ConstraintLayout newLayout) {
+        try {
+            ConstraintLayout.LayoutParams newParams =
+                    (ConstraintLayout.LayoutParams) newView.getLayoutParams();
+            newLayout.removeView(newView);
+            oldLayout.removeView(oldView);
+            newLayout.addView(oldView, newParams);
+        } catch (Exception ex) {
+            String parentStr = "Parent NA";
+            if (oldView.getParent() instanceof View) {
+                parentStr = getViewInfo((View) oldView.getParent(), "parent");
+            }
+            String msg = "Error replacing view: \n"
+                    + getViewInfo(oldView, "oldView") + "\n"
+                    + getViewInfo(newView, "newView") + "\n"
+                    + getViewInfo(oldLayout, "oldLayout") + "\n"
+                    + getViewInfo(newLayout, "newLayout") + "\n"
+                    + parentStr + "\n";
+            Utils.excMsg(this, "Error replacing view", ex);
+            Log.e(TAG, "Error replacing view: \n"
+                            + getViewInfo(oldView, "oldView") + "\n"
+                            + getViewInfo(newView, "newView") + "\n"
+                            + getViewInfo(oldLayout, "oldLayout") + "\n"
+                            + getViewInfo(newLayout, "newLayout") + "\n"
+                            + parentStr + "\n"
+                    , ex);
+        }
+    }
+
+    /**
+     * Utility method for printing a hash code in hex.
+     *
+     * @param obj The object whose hash code is desired.
+     * @return The hex-formatted hash code.
+     */
+    public String getHashCode(Object obj) {
+        return String.format("%08X", obj.hashCode());
+    }
+
+    /**
+     * Get the resource id for the view.
+     *
+     * @param view The View.
+     * @return The id.
+     */
+    public String getViewId(View view) {
+        return getResources().getResourceEntryName(view.getId());
+    }
+
+    /**
+     * Get info for a view, including the id, name, and hash code.
+     *
+     * @param view
+     * @param tag  User-supplied tag, preferably <= 8 characters.
+     * @return The info.
+     */
+    public String getViewInfo(View view, String tag) {
+        String hash = getHashCode(view);
+        String id = getViewId(view);
+        String name = view.getClass().getSimpleName();
+        return String.format("%-8s %-8s %-20s %8s", id, tag, name, hash);
+    }
 
     @Override
     public void onDestroy() {
@@ -613,7 +817,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         editor.apply();
     }
 
-//    public void resetPlot(int samplingRate) {
+//    public void resetPlotInstance(int samplingRate) {
 //        mSamplingRate = samplingRate;
 //        mNLarge = (int) Math.round(.2 * samplingRate);
 //        mNTotalPoints = 150 * mNLarge;
@@ -626,18 +830,21 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
 //    }
 
     private void allowPan(boolean allow) {
+        // ECG
         if (allow) {
             PanZoom.attach(mECGPlot, PanZoom.Pan.HORIZONTAL,
                     PanZoom.Zoom.NONE);
         } else {
             PanZoom.attach(mECGPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
         }
+        // HR
         if (allow) {
             PanZoom.attach(mHRPlot, PanZoom.Pan.HORIZONTAL,
                     PanZoom.Zoom.NONE);
         } else {
             PanZoom.attach(mHRPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
         }
+        // QRS
         if (mUseQRSPlot) {
             if (allow) {
                 PanZoom.attach(mQRSPlot, PanZoom.Pan.HORIZONTAL,
@@ -653,9 +860,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
      * Save the current samples as a file.  Prompts for a note, then calls
      * the appropriate doSave method.
      *
-     * @param saveType The SAVE_TYPE.
+     * @param saveType The SaveType.
      */
-    private void saveDataWithNote(final SAVE_TYPE saveType) {
+    private void saveDataWithNote(final SaveType saveType) {
         String msg;
         String state = Environment.getExternalStorageState();
         if (!Environment.MEDIA_MOUNTED.equals(state)) {
@@ -688,6 +895,12 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                         case BOTH:
                             doSaveData(input.getText().toString());
                             doSavePlot(input.getText().toString());
+                            break;
+                        case ALL:
+                            doSaveData(input.getText().toString());
+                            doSavePlot(input.getText().toString());
+                            doSaveSessionData(SaveType.DEVICE_HR);
+                            doSaveSessionData(SaveType.QRS_HR);
                             break;
                         case DEVICE_HR:
                         case QRS_HR:
@@ -794,7 +1007,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 // Write header
                 out.write(mStopTime.toString() + "\n");
                 // The text for this TextView already has a \n
-                out.write(mTextViewFW.getText().toString());
+                out.write(mTextViewInfo.getText().toString());
                 out.write(note + "\n");
                 out.write("HR " + mStopHR + "\n");
                 // Write samples
@@ -826,7 +1039,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
      *
      * @param saveType The saveType (either DEVICE_HR or QRS_HR).
      */
-    private void doSaveSessionData(SAVE_TYPE saveType) {
+    private void doSaveSessionData(SaveType saveType) {
         SharedPreferences prefs = getPreferences(MODE_PRIVATE);
         String treeUriStr = prefs.getString(PREF_TREE_URI, null);
         if (treeUriStr == null) {
@@ -839,10 +1052,10 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         String fileName;
         List<HRPlotter.HrRrData> dataList;
         try {
-            if (saveType == SAVE_TYPE.DEVICE_HR) {
+            if (saveType == SaveType.DEVICE_HR) {
                 fileName = "PolarECG-DeviceHR-" + df.format(mStopTime) + ".csv";
                 dataList = mHRPlotter.mHrRrList1;
-            } else if (saveType == SAVE_TYPE.QRS_HR) {
+            } else if (saveType == SaveType.QRS_HR) {
                 fileName = "PolarECG-QRSHR-" + df.format(mStopTime) + ".csv";
                 dataList = mHRPlotter.mHrRrList2;
             } else {
@@ -868,7 +1081,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                  PrintWriter out = new PrintWriter((writer))) {
                 // Write header
                 // Write samples
-                for(HRPlotter.HrRrData data : dataList) {
+                for (HRPlotter.HrRrData data : dataList) {
                     out.write(data.getCVSString() + "\n");
                 }
                 out.flush();
@@ -960,13 +1173,13 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                             }).observeOn(AndroidSchedulers.mainThread())
                             .subscribe(polarEcgData -> {
 //                                        logTimestampInfo(polarEcgData);
-                                        if (qrs == null) {
-                                            qrs = new QRSDetection(ECGActivity.this,
+                                        if (mQRS == null) {
+                                            mQRS = new QRSDetection(ECGActivity.this,
                                                     mECGPlotter, mHRPlotter,
                                                     mQRSPlotter);
                                         }
 //                                        logEcgDataInfo(polarEcgData);
-                                        qrs.process(polarEcgData);
+                                        mQRS.process(polarEcgData);
                                         // Update the elapsed time
                                         double elapsed =
                                                 mECGPlotter.getDataIndex() / 130.;
@@ -988,6 +1201,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             // NOTE stops streaming if it is "running"
             mEcgDisposable.dispose();
             mEcgDisposable = null;
+            if (mQRS != null) mQRS = null;
         }
     }
 
@@ -1041,13 +1255,11 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 polarEcgData.timeStamp /
                         1000000;
         long ts1 = ts + offset0;
-        long ts2 = ts + offset0 + offset1;
         long now = new Date().getTime();
         Log.d(TAG, timestampInfo(offset1,
                 "offset1"));
         Log.d(TAG, timestampInfo(ts, "ts"));
         Log.d(TAG, timestampInfo(ts1, "ts1"));
-        Log.d(TAG, timestampInfo(ts2, "ts2"));
         Log.d(TAG, timestampInfo(now, "now"));
     }
 
@@ -1111,7 +1323,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     }
 
     public void restart() {
-        Log.v(TAG, this.getClass().getSimpleName() + " restart:"
+        Log.d(TAG, this.getClass().getSimpleName() + " restart:"
                 + " mApi=" + mApi
                 + " mDeviceId=" + mDeviceId);
         if (mApi != null || mDeviceId == null || mDeviceId.isEmpty()) {
@@ -1124,40 +1336,67 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         mPlaying = false;
         if (mECGPlotter != null) mECGPlotter.clear();
         if (mQRSPlotter != null) mQRSPlotter.clear();
+        if (mHRPlotter != null) mHRPlotter.clear();
         mTextViewHR.setText("");
         mTextViewTime.setText("");
-        mTextViewFW.setText("");
+        mTextViewInfo.setText("");
         invalidateOptionsMenu();
         Toast.makeText(this,
                 getString(R.string.connecting) + " " + mDeviceId,
                 Toast.LENGTH_SHORT).show();
-        if (mEcgPlotListener != null) {
-            mECGPlot.removeListener(mEcgPlotListener);
-            mEcgPlotListener = null;
+        // Add listeners to handle orientation change
+        Log.d(TAG, "    adding PlotListner mECGPlotListener=" + mECGPlotListener);
+        if (mECGPlotListener != null) {
+            mECGPlot.removeListener(mECGPlotListener);
+            mECGPlotListener = null;
         }
-        mEcgPlotListener = new PlotListener() {
+        mECGPlotListener = new PlotListener() {
             @Override
             public void onBeforeDraw(Plot source, Canvas canvas) {
+                if (mOrientationChangedECG) {
+                    Log.d(TAG, "onBeforeDraw: " + ECGPlotter.sdfshort.format(new Date()));
+                }
             }
 
             @Override
             public void onAfterDraw(Plot source, Canvas canvas) {
 //                long now = new Date().getTime();
 //                Log.d(TAG,
-//                        "onAfterDraw: mOrientationChanged=" +
+//                        "onAfterDraw: ,=" +
 //                        mOrientationChanged +
 //                                " deltaT=" + (now - redrawTime0));
 //                redrawTime0 = now;
-                if (mOrientationChanged) {
-                    mOrientationChanged = false;
-                    Log.d(TAG, "onAfterDraw: orientation changed");
-                    mECGPlotter.setupPlot();
-                    mECGPlotter.updateDomainBoundaries();
-                    mECGPlotter.update();
-                }
             }
         };
-        mECGPlot.addListener(mEcgPlotListener);
+        mECGPlot.addListener(mECGPlotListener);
+//
+//        if (mQRSPlotListener != null) {
+//            mQRSPlot.removeListener(mQRSPlotListener);
+//            mQRSPlotListener = null;
+//        }
+//        mQRSPlotListener = new PlotListener() {
+//            @Override
+//            public void onBeforeDraw(Plot source, Canvas canvas) {
+//            }
+//
+//            @Override
+//            public void onAfterDraw(Plot source, Canvas canvas) {
+////                long now = new Date().getTime();
+////                Log.d(TAG,
+////                        "onAfterDraw: ,=" +
+////                        mOrientationChanged +
+////                                " deltaT=" + (now - redrawTime0));
+////                redrawTime0 = now;
+//                if (mOrientationChangedQRS) {
+//                    mOrientationChangedQRS = false;
+//                    Log.d(TAG, "onAfterDraw: orientation changed");
+//                    mQRSPlotter.setupPlot();
+//                    mOrientationChanged =
+//                            mOrientationChangedECG || mOrientationChangedQRS;
+//                }
+//            }
+//        };
+//        mQRSPlot.addListener(mQRSPlotListener);
 
         mApi = PolarBleApiDefaultImpl.defaultImplementation(this,
                 PolarBleApi.FEATURE_POLAR_SENSOR_STREAMING |
@@ -1221,7 +1460,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                         "-00805f9b34fb"))) {
                     mFirmware = s1.trim();
                     Log.d(TAG, "*Firmware: " + s + " " + mFirmware);
-                    mTextViewFW.setText(getString(R.string.info_string,
+                    mTextViewInfo.setText(getString(R.string.info_string,
                             mName, mBatteryLevel, mFirmware, mDeviceId));
                 }
             }
@@ -1230,7 +1469,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             public void batteryLevelReceived(@NonNull String s, int i) {
                 mBatteryLevel = Integer.toString(i);
                 Log.d(TAG, "*Battery level " + s + " " + i);
-                mTextViewFW.setText(getString(R.string.info_string,
+                mTextViewInfo.setText(getString(R.string.info_string,
                         mName, mBatteryLevel, mFirmware, mDeviceId));
             }
 

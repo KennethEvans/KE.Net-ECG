@@ -23,6 +23,14 @@ interface IQRSConstants {
      */
     int N_ECG_PLOT_POINTS = 4 * N_SMALL_BOXES_PER_LARGE_BOX * N_LARGE;
     // =520 points -> 4 sec
+    /**
+     * Number of large boxes visible on the x axis.
+     */
+    int N_DOMAIN_LARGE_BOXES = N_ECG_PLOT_POINTS / N_LARGE; // = 20
+    /**
+     * Ratio of mV to mm for a box.
+     */
+    int RATIO_MM_MV = 100;
 
     /**
      * Data window size.  Must be large enough for maximum number of
@@ -36,7 +44,7 @@ interface IQRSConstants {
     /**
      * Moving average HR window size.
      */
-    int MOV_AVG_HR_WINDOW = 5;
+    int MOV_AVG_HR_WINDOW = 10;
     /**
      * Moving average height window size.
      */
@@ -51,6 +59,14 @@ interface IQRSConstants {
      */
     double MOV_AVG_HEIGHT_THRESHOLD_FACTOR = .4;
     /**
+     * The maximum number of samples between R and S. The normal
+     * duration (interval) of the QRS complex is between 0.08 and 0.10
+     * seconds When the duration is between 0.10 and 0.12 seconds, it is
+     * intermediate or slightly prolonged. A QRS duration of greater than
+     * 0.12 seconds is considered abnormal.
+     */
+    int MAX_QRS_LENGTH = (int)Math.round(.10 * FS); // 13
+    /**
      * The group delay, used for searching ecg for maxima.
      * Coefficients: bandpass=7, deriv=4, square=1, average=20.
      * Delay is (N-1)/2, N = number of coefficients for FIR filter.
@@ -58,6 +74,12 @@ interface IQRSConstants {
      * 18 chosen empirically.
      */
     int SCORE_OFFSET = 18;
+
+    /**
+     * How many seconds the domain interval is for the HRPlotter.
+     */
+    long HR_PLOT_DOMAIN_INTERVAL = 1 * 60000;  // 1 min
+
 
     /**
      * Convert μV to mV.

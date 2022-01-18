@@ -6,16 +6,20 @@
         android:title="@string/pause_item"
         app:showAsAction="ifRoom" />
     <item
+        android:id="@+id/save_both"
+        android:title="@string/save_both_item"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/save_all"
+        android:title="@string/save_all_item"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/save_plot"
         android:title="@string/save_plot_item"
         app:showAsAction="never" />
     <item
         android:id="@+id/save_data"
         android:title="@string/save_data_item"
-        app:showAsAction="never" />
-    <item
-        android:id="@+id/save_both"
-        android:title="@string/save_both_item"
         app:showAsAction="never" />
     <item
         android:id="@+id/save_device_data"
@@ -34,7 +38,7 @@
         android:title="@string/choose_data_directory_item"
         app:showAsAction="never" />
     <item
-        android:id="@+id/info"
+        android:id="@+id/hr"
         android:title="@string/info_item"
         app:showAsAction="never" />
 </menu>

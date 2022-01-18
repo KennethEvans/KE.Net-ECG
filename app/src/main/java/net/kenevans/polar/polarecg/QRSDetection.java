@@ -22,12 +22,22 @@ public class QRSDetection implements IConstants, IQRSConstants {
     boolean mScoring = false;
     int mScoreStart = -1;
     int mScoreEnd = -1;
-    int mMaxIndex = -1;
 
     private int mNSamples = 0;
     private double mStartTime = Double.NaN;
 
+    // These keep track of the lowest and highest ECG values in the scoring
+    // window. The max should correspond to R and the min to S. The normal
+    // duration (interval) of the QRS complex is between 0.08 and 0.10
+    // seconds When the duration is between 0.10 and 0.12 seconds, it is
+    // intermediate or slightly prolonged. A QRS duration of greater than
+    // 0.12 seconds is considered abnormal. 0.12 ms = 16 samples. 0.10
+    // samples = 13 samples.
     double mMaxEcg = -Double.MAX_VALUE;
+    double mMinEcg = Double.MAX_VALUE;
+    int mMaxIndex = -1;
+    int mMinIndex = -1;
+
     double mMaxAvgHeight = MOV_AVG_HEIGHT_DEFAULT;
 
     private FixedSizeList<Double> curButterworth =
@@ -39,9 +49,6 @@ public class QRSDetection implements IConstants, IQRSConstants {
     private FixedSizeList<Double> curEcg = new FixedSizeList<>(DATA_WINDOW);
 
     private List<Double> ecgVals = new ArrayList<>();
-//    private List<Double> avgVals = new ArrayList<>();
-//    private List<Integer> sampleNumberVals = new ArrayList<>();
-//    private List<Double> timeVals = new ArrayList<>();
 
     /**
      * Moving average of the data.
@@ -98,8 +105,6 @@ public class QRSDetection implements IConstants, IQRSConstants {
         // Record the start time as now.
         if (Double.isNaN(mStartTime)) mStartTime = new Date().getTime();
         ecgVals.add(ecg);
-//        sampleNumberVals.add(mNSamples);
-//        timeVals.add(mStartTime + mNSamples / FS);
         mNSamples++;
 
         FixedSizeList<Double> input;
@@ -137,7 +142,6 @@ public class QRSDetection implements IConstants, IQRSConstants {
         movingAverage.add(doubleVal);
         doubleVal = movingAverage.average();
         curAvg.set(curAvg.size() - 1, doubleVal);
-//        avgVals.add(doubleVal);
 
         // Score
         input = curAvg;
@@ -171,29 +175,35 @@ public class QRSDetection implements IConstants, IQRSConstants {
                     // Wait to start plotting until HR average is well defined
                     if (movingAverageHr.size() >= MOV_AVG_HR_WINDOW) {
                         mHRPlotter.addValues2(mStartTime + 1000 * mMaxIndex / FS,
-                                movingAverageHr.average(),
-                                (double) rr);
+                                movingAverageHr.average(), rr);
                         mHRPlotter.fullUpdate();
                     }
                 }
             }
-            // Do QRS plot
-            mQRSPlotter.addPeakValue(mMaxIndex, peakEcgVal);
-            // Recalculate the threshold
-            movingAverageHeight.add(mMaxAvgHeight);
-            threshold = MOV_AVG_HEIGHT_THRESHOLD_FACTOR
-                    * movingAverageHeight.average();
-            mMaxIndex = -1;
+            // Don't count this one if the interval between R and S is too long
+            if (mMaxIndex - mMinIndex <= MAX_QRS_LENGTH) {
+                // Do QRS plot
+                mQRSPlotter.addPeakValue(mMaxIndex, peakEcgVal);
+                // Recalculate the threshold
+                movingAverageHeight.add(mMaxAvgHeight);
+                threshold = MOV_AVG_HEIGHT_THRESHOLD_FACTOR
+                        * movingAverageHeight.average();
+            }
+            // Reset
+            mMaxIndex = mMinIndex = -1;
+            mMaxEcg = -Double.MAX_VALUE;
+            mMinEcg = -Double.MAX_VALUE;
         }
         if (mScoring) {
             if (mScoreStart == i) {
                 // Start of interval, set up mScoring
                 if (i >= SCORE_OFFSET) {
-                    mMaxIndex = i - SCORE_OFFSET;
-                    mMaxEcg = ecgVals.get(i - SCORE_OFFSET);
+                    mMaxIndex = mMinIndex = i - SCORE_OFFSET;
+                    mMaxEcg = mMinEcg = ecgVals.get(i - SCORE_OFFSET);
                 } else {
-                    mMaxIndex = -1;
+                    mMaxIndex = mMinIndex = -1;
                     mMaxEcg = -Double.MAX_VALUE;
+                    mMinEcg = -Double.MAX_VALUE;
                 }
                 mMaxAvgHeight = input.getLast();
             } else {
@@ -203,6 +213,10 @@ public class QRSDetection implements IConstants, IQRSConstants {
                     if (last > mMaxEcg) {
                         mMaxEcg = last;
                         mMaxIndex = i - SCORE_OFFSET;
+                    }
+                    if (last < mMinEcg) {
+                        mMinEcg = last;
+                        mMinIndex = i - SCORE_OFFSET;
                     }
                     last = input.getLast();
                     if (last > mMaxAvgHeight) {
