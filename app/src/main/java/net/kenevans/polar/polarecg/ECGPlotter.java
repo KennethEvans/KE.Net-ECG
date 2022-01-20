@@ -9,38 +9,46 @@ import com.androidplot.util.DisplayDimensions;
 import com.androidplot.util.PixelUtils;
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
+import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.StepMode;
+import com.androidplot.xy.XYGraphWidget;
 import com.androidplot.xy.XYPlot;
 import com.androidplot.xy.XYRegionFormatter;
 import com.androidplot.xy.XYSeriesFormatter;
 import com.polar.sdk.api.model.PolarEcgData;
 
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
 @SuppressWarnings("WeakerAccess")
 public class ECGPlotter implements IConstants, IQRSConstants {
-    private final ECGActivity activity;
+    private ECGActivity mActivity;
     private XYPlot mPlot;
 
-    private final XYSeriesFormatter<XYRegionFormatter> mFormatter;
-    private final SimpleXYSeries mSeries;
+    private XYSeriesFormatter<XYRegionFormatter> mFormatter;
+    private SimpleXYSeries mSeries;
     /**
      * The next index in the data
      */
     private long mDataIndex;
 
-    public static final SimpleDateFormat sdfshort =
-            new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
 
+    /**
+     * CTOR that just sets the plot.
+     *
+     * @param plot The XYPlot.
+     */
+    public ECGPlotter(XYPlot plot) {
+        this.mPlot = plot;
+        // Don't do anything else
+    }
 
     public ECGPlotter(ECGActivity activity, XYPlot plot,
                       String title, Integer lineColor, boolean showVertices) {
         Log.d(TAG, this.getClass().getSimpleName() + " ECGPlotter CTOR");
-        // This is the activity, needed for resources
-        this.activity = activity;
+        // This is the mActivity, needed for resources
+        this.mActivity = activity;
         this.mPlot = plot;
         this.mDataIndex = 0;
 
@@ -53,14 +61,33 @@ public class ECGPlotter implements IConstants, IQRSConstants {
     }
 
     /**
+     * Get a new ECGPLotter instance, using the given XYPlot but other values
+     * from the current one. Use for replacing the current plotter.
+     *
+     * @param plot The XYPLot.
+     * @return The new instance.
+     */
+    public ECGPlotter getNewInstance(XYPlot plot) {
+        ECGPlotter newPlotter = new ECGPlotter(plot);
+        newPlotter.mPlot = plot;
+        newPlotter.mActivity = this.mActivity;
+        newPlotter.mDataIndex = this.mDataIndex;
+        newPlotter.mFormatter = this.mFormatter;
+        newPlotter.mSeries = this.mSeries;
+        newPlotter.mPlot.addSeries(mSeries, mFormatter);
+        newPlotter.setupPlot();
+        return newPlotter;
+    }
+
+    /**
      * Sets the plot parameters, calculating the range boundaries to have the
-     * same grid as the domain.  Calls update when done.
+     * same grid as the domain. Calls update when done.
      */
     public void setupPlot() {
-        Log.d(TAG, this.getClass().getSimpleName() + " setupPlot");
-
-//        mPlot.getGraph().refreshLayout();
-        mPlot.layout(mPlot.getDisplayDimensions());
+        Log.d(TAG, this.getClass().getSimpleName() + " setupPlot"
+                + " plotter=" + Utils.getHashCode(this)
+                + " plot=" + Utils.getHashCode(mPlot)
+        );
 
         // Calculate the range limits to make the blocks be square.
         // A large box is .5 mV. rMax corresponds to half the total
@@ -69,7 +96,8 @@ public class ECGPlotter implements IConstants, IQRSConstants {
         double rMax = .25 * N_DOMAIN_LARGE_BOXES * gridRect.height()
                 / gridRect.width();
 
-//        mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
+        // None is the default, but set it explicitly anyway
+        mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
 
 //        // DEBUG
 //        mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.LEFT);
@@ -93,71 +121,104 @@ public class ECGPlotter implements IConstants, IQRSConstants {
                 PixelUtils.dpToPix(1.5f));
 
         // Domain
-        mPlot.setDomainBoundaries(-N_ECG_PLOT_POINTS, 0, BoundaryMode.FIXED);
+        updateDomainBoundaries();
         // Set the domain block to be .2 * nlarge so large block will be
         // nLarge samples
-        mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
-                .2 * N_LARGE);
+        mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL, .2 * N_LARGE);
         mPlot.setLinesPerDomainLabel(5);
 
-        mPlot.calculateMinMaxVals();
+//        // Allow panning
+//        PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
 
-//        mPlot.invalidate();
+        // Debug
+        Log.d(TAG, this.getClass().getSimpleName()
+                + " setupPlot: Before update\n" + getLogInfo(rMax));
 
-//        // Update the plot
-//        update();
+        // Update the plot
+        update();
+    }
 
-        Log.d(TAG, "    renderMode=" + (mPlot.getRenderMode()
-                == Plot.RenderMode.USE_MAIN_THREAD ? "Main" : "Background"));
+    public String getLogInfo(double rMax) {
+        RectF gridRect = mPlot.getGraph().getGridRect();
+        StringBuilder sb = new StringBuilder();
+        sb.append("    renderMode=").append(mPlot.getRenderMode()
+                == Plot.RenderMode.USE_MAIN_THREAD ? "Main" : "Background")
+                .append("\n");
         DisplayDimensions dims = mPlot.getDisplayDimensions();
-        Log.d(TAG, "    view LRTB=" + mPlot.getLeft()
-                + "," + mPlot.getRight() + "," + mPlot.getTop()
-                + "," + mPlot.getBottom());
-        Log.d(TAG, "    canvasRect LRTB=" + dims.canvasRect.left
-                + "," + dims.canvasRect.right + "," + dims.canvasRect.top
-                + "," + dims.canvasRect.bottom);
-        Log.d(TAG, "    marginatedRect LRTB=" + dims.marginatedRect.left
-                + "," + dims.marginatedRect.right + "," + dims.marginatedRect.top
-                + "," + dims.marginatedRect.bottom);
-        Log.d(TAG, "    paddedRect LRTB=" + dims.paddedRect.left
-                + "," + dims.paddedRect.right + "," + dims.paddedRect.top
-                + "," + dims.paddedRect.bottom);
-        Log.d(TAG, "    gridRect LRTB=" + gridRect.left + "," + gridRect.right +
-                "," + gridRect.top + "," + gridRect.bottom);
-        Log.d(TAG, "    gridRect width=" + gridRect.width() +
-                " height=" + gridRect.height());
-        DisplayMetrics displayMetrics = activity.getResources()
+        sb.append("    view LRTB=").append(mPlot.getLeft()).append(",").
+                append(mPlot.getRight()).append(",")
+                .append(mPlot.getTop()
+                ).append(",").append(mPlot.getBottom()).append("\n");
+        sb.append("    canvasRect LRTB=").append(dims.canvasRect.left)
+                .append(",").append(dims.canvasRect.right)
+                .append(",").append(dims.canvasRect.top)
+                .append(",").append(dims.canvasRect.bottom)
+                .append("\n");
+        sb.append("    marginatedRect LRTB=").append(dims.marginatedRect.left)
+                .append(",").append(dims.marginatedRect.right).append(",")
+                .append(dims.marginatedRect.top).append(",")
+                .append(dims.marginatedRect.bottom).append("\n");
+        sb.append("    paddedRect LRTB=")
+                .append(dims.paddedRect.left).append(",")
+                .append(dims.paddedRect.right).append(",")
+                .append(dims.paddedRect.top).append(",").
+                append(dims.paddedRect.bottom).append("\n");
+        sb.append("    gridRect LRTB=").append(gridRect.left).append(",")
+                .append(gridRect.right).append(",")
+                .append(gridRect.top).append(",").append(gridRect.bottom)
+                .append("\n");
+        sb.append("    gridRect width=").append(gridRect.width())
+                .append(" height=").append(gridRect.height()).append("\n");
+        DisplayMetrics displayMetrics = mActivity.getResources()
                 .getDisplayMetrics();
-        Log.d(TAG, "    display widthPixels=" + displayMetrics.widthPixels +
-                " heightPixels=" + displayMetrics.heightPixels);
-        Log.d(TAG, "    rMax = " + rMax);
-        Log.d(TAG, String.format(
+        sb.append("    display widthPixels=").append(displayMetrics.widthPixels)
+                .append(" heightPixels=").append(displayMetrics.heightPixels)
+                .append("\n");
+        sb.append("    rMax = ").append(rMax).append("\n");
+        sb.append(String.format(Locale.US,
                 "    Range: min=%.3f step=%.3f max=%.3f origin=%.3f",
                 mPlot.getBounds().getMinY().doubleValue(),
                 mPlot.getRangeStepValue(),
                 mPlot.getBounds().getMaxY().doubleValue(),
-                mPlot.getRangeOrigin().doubleValue()));
-        Log.d(TAG,
-                "    innerLimits min,max=" + mPlot.getInnerLimits().getMinY()
-                        + "," + mPlot.getInnerLimits().getMinY());
-        Log.d(TAG,
-                "    outerLimits min,max=" + mPlot.getOuterLimits().getMinY()
-                        + "," + mPlot.getOuterLimits().getMinY());
+                mPlot.getRangeOrigin().doubleValue())).append("\n");
+        sb.append(String.format(Locale.US,
+                "    Domain: min=%.3f step=%.3f max=%.3f origin=%.3f",
+                mPlot.getBounds().getMinX().doubleValue(),
+                mPlot.getDomainStepValue(),
+                mPlot.getBounds().getMaxX().doubleValue(),
+                mPlot.getDomainOrigin().doubleValue())).append("\n");
+        sb.append("    innerLimits min,max=")
+                .append(mPlot.getInnerLimits().getMinY()).append(",")
+                .append(mPlot.getInnerLimits().getMinY()).append("\n");
+        sb.append("    outerLimits min,max=")
+                .append(mPlot.getOuterLimits().getMinY()).append(",")
+                .append(mPlot.getOuterLimits().getMinY()).append("\n");
         double screenYMax = mPlot.seriesToScreenY(rMax);
         double screenYMin = mPlot.seriesToScreenY(-rMax);
         double screenTop = mPlot.seriesToScreenY(mPlot.getBounds().getMaxY());
-        double screenBottom = mPlot.seriesToScreenY(mPlot.getBounds().getMinY());
-        Log.d(TAG, "    screenY(rMax)=" + screenYMax
-                + " screenY(-rMax)=" + screenYMin
-                + " screenY(top)=" + screenTop
-                + " screenY(bottom)=" + screenBottom);
-        Log.d(TAG, "    layoutRequested=" + mPlot.isLayoutRequested()
-                + " isLaidOut=" + mPlot.isLaidOut()
-                + " isInLayout=" + mPlot.isInLayout());
-        Log.d(TAG, "    Time=" + sdfshort.format(new Date())
-                + " mOrientationChangedECG=" + activity.mOrientationChangedECG
-                + " height=" + mPlot.getHeight()
-                + " isLaidOut=" + mPlot.isLaidOut());
+        double screenBottom =
+                mPlot.seriesToScreenY(mPlot.getBounds().getMinY());
+        sb.append("    screenY(rMax)=").append(screenYMax).append(" screenY")
+                .append("(-rMax)=").append(screenYMin)
+                .append(" screenY(top)=").append(screenTop)
+                .append(" screenY(bottom)=").append(screenBottom).append("\n");
+//        sb.append("    layoutRequested=").append(mPlot.isLayoutRequested())
+//                .append(" isLaidOut=").append(mPlot.isLaidOut())
+//                .append(" isInLayout=").append(mPlot.isInLayout())
+//                .append("\n");
+
+        // ECG Specific
+        sb.append("    mDataIndex=").append(mDataIndex).append(" mSeries: " +
+                "size=").append(mSeries.getxVals().size()).append(
+                "\n");
+        sb.append("    Time=").append(ECGActivity.sdfshort.format(new Date()))
+                .append(" mOrientationChangedECG=")
+                .append(mActivity.mOrientationChangedECG)
+                .append(" height=").append(mPlot.getHeight()).append(" " +
+                "isLaidOut=")
+                .append(mPlot.isLaidOut()).append("\n");
+
+        return sb.toString();
     }
 
     public SimpleXYSeries getSeries() {
@@ -212,14 +273,49 @@ public class ECGPlotter implements IConstants, IQRSConstants {
      * Updates the plot. Runs on the UI thread.
      */
     public void update() {
-        //            Log.d(TAG, this.getClass().getSimpleName()
-        //                    + " update: thread: " + Thread.currentThread()
-        //                    .getName());
-        Log.d(TAG, "ECGPLot update: " + sdfshort.format(new Date())
-            + " mOrientationChangedECG=" + activity.mOrientationChangedECG
-            + " height=" + mPlot.getHeight()
-            + " isLaidOut=" + mPlot.isLaidOut());
-        activity.runOnUiThread(mPlot::redraw);
+//        Log.d(TAG, this.getClass().getSimpleName()
+//                + " update: thread: " + Thread.currentThread()
+//                .getName());
+//        Log.d(TAG, "ECGPLot update: " + ECGActivity.sdfshort.format(new Date())
+//                + " mOrientationChangedECG=" + mActivity.mOrientationChangedECG
+//                + " height=" + mPlot.getHeight()
+//                + " isLaidOut=" + mPlot.isLaidOut()
+//                + " plotter=" + Utils.getHashCode(this)
+//                + " plot=" + Utils.getHashCode(mPlot)
+//        );
+        mActivity.runOnUiThread(mPlot::redraw);
+    }
+
+    /**
+     * Gets info about the view.
+     */
+    private String getPlotInfo() {
+        final String LF = "\n";
+        StringBuilder sb = new StringBuilder();
+        if (mPlot == null) {
+            sb.append("Plot is null");
+            return sb.toString();
+        }
+        sb.append("Title=").append(mPlot.getTitle().getText()).append(LF);
+        sb.append("Range Title=").append(mPlot.getRangeTitle().getText()).append(LF);
+        sb.append("Domain Title=").append(mPlot.getDomainTitle().getText()).append(LF);
+        sb.append("Range Origin=").append(mPlot.getRangeOrigin()).append(LF);
+        long timeVal = mPlot.getDomainOrigin().longValue();
+        Date date = new Date(timeVal);
+        sb.append("Domain Origin=").append(date.toString()).append(LF);
+        sb.append("Range Step Value=").append(mPlot.getRangeStepValue()).append(LF);
+        sb.append("Domain Step Value=").append(mPlot.getDomainStepValue()).append(LF);
+        sb.append("Graph Width=").append(mPlot.getGraph().getSize().getWidth().getValue()).append(LF);
+        sb.append("Graph Height=").append(mPlot.getGraph().getSize().getHeight().getValue()).append(LF);
+        sb.append("mDataIndex=").append(mDataIndex).append(LF);
+        if (mSeries != null) {
+            if (mSeries.getxVals() != null) {
+                sb.append("mSeries Size=").append(mSeries.getxVals().size()).append(LF);
+            }
+        } else {
+            sb.append("mSeries=Null").append(LF);
+        }
+        return sb.toString();
     }
 
     /**
@@ -229,12 +325,6 @@ public class ECGPlotter implements IConstants, IQRSConstants {
         mDataIndex = 0;
         mSeries.clear();
         update();
-    }
-
-    public void resetPlotInstance(XYPlot plot) {
-        mPlot = plot;
-        mPlot.clear();
-        mPlot.addSeries(mSeries, mFormatter);
     }
 
     public long getDataIndex() {

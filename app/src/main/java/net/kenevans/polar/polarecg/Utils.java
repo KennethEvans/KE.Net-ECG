@@ -23,7 +23,6 @@ package net.kenevans.polar.polarecg;
 
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
 
@@ -48,12 +47,7 @@ public class Utils implements IConstants {
                     .setTitle(title)
                     .setMessage(msg)
                     .setPositiveButton(context.getText(R.string.ok),
-                            new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog,
-                                                    int which) {
-                                    dialog.cancel();
-                                }
-                            }).create();
+                            (dialog, which) -> dialog.cancel()).create();
             alertDialog.show();
         } catch (Throwable t) {
             Log.e(getContextTag(context), "Error using " + title
@@ -159,6 +153,17 @@ public class Utils implements IConstants {
             ext = s.substring(i + 1).toLowerCase();
         }
         return ext;
+    }
+
+    /**
+     * Utility method for printing a hash code in hex.
+     *
+     * @param obj The object whose hash code is desired.
+     * @return The hex-formatted hash code.
+     */
+    @SuppressWarnings("unused")
+    public static String getHashCode(Object obj) {
+        return String.format("%08X", obj.hashCode());
     }
 
 }

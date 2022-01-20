@@ -11,13 +11,11 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.text.InputType;
@@ -31,8 +29,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.androidplot.Plot;
-import com.androidplot.PlotListener;
 import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.XYPlot;
 import com.google.gson.Gson;
@@ -77,25 +73,25 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.functions.Function;
 
-public class ECGActivity extends AppCompatActivity implements IConstants {
+public class ECGActivity extends AppCompatActivity implements IConstants,
+        IQRSConstants {
+    public static final SimpleDateFormat sdfshort =
+            new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
     SharedPreferences mSharedPreferences;
     private static final int MAX_DEVICES = 3;
     // Currently the sampling rate is fixed at 130
-    private static final int mSamplingRate = 130;
     private QRSDetection mQRS;
     List<DeviceInfo> mMruDevices;
     private XYPlot mECGPlot;
     private XYPlot mHRPlot;
     private XYPlot mQRSPlot;
-    private ECGPlotter mECGPlotter;
-    private HRPlotter mHRPlotter;
-    private QRSPlotter mQRSPlotter;
+    public ECGPlotter mECGPlotter;
+    public HRPlotter mHRPlotter;
+    public QRSPlotter mQRSPlotter;
 
-    private PlotListener mECGPlotListener;
-    private PlotListener mQRSPlotListener;
-    public boolean mOrientationChanged = false;
     public boolean mOrientationChangedECG = false;
     public boolean mOrientationChangedQRS = false;
+    public boolean mOrientationChangedHR = false;
 
     //    public boolean useQRSPlotter = true;
     public boolean mUseQRSPlot = true;
@@ -106,7 +102,6 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     private enum SaveType {DATA, PLOT, BOTH, DEVICE_HR, QRS_HR, ALL}
 
     TextView mTextViewHR, mTextViewInfo, mTextViewTime;
-    ConstraintLayout mLayoutTop, mLayoutAnalysis, mLayoutEcg;
     private PolarBleApi mApi;
     private Disposable mEcgDisposable;
     private boolean mPlaying;
@@ -121,7 +116,6 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     //* Date when stopped playing. Updated whenever playing started or
     // stopped. */
     private Date mStopTime;
-    private Date mStartTime;
 
     private final ActivityResultLauncher<Intent> enableBluetoothLauncher =
             registerForActivityResult(
@@ -146,54 +140,53 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                         Log.d(TAG,
                                 "Current permissions (initial): "
                                         + UriUtils.getNPersistedPermissions(this));
-                        if (result.getResultCode() == RESULT_OK) {
-                            // Get Uri from Storage Access Framework.
-                            Uri treeUri = result.getData().getData();
-                            SharedPreferences.Editor editor =
-                                    getPreferences(MODE_PRIVATE)
-                                            .edit();
-                            if (treeUri == null) {
-                                editor.putString(PREF_TREE_URI, null);
-                                editor.apply();
-                                Utils.errMsg(this, "Failed to get persistent " +
-                                        "access permissions");
-                                return;
+                        try {
+                            if (result.getResultCode() == RESULT_OK) {
+                                // Get Uri from Storage Access Framework.
+                                Uri treeUri = result.getData().getData();
+                                SharedPreferences.Editor editor =
+                                        getPreferences(MODE_PRIVATE)
+                                                .edit();
+                                if (treeUri == null) {
+                                    editor.putString(PREF_TREE_URI, null);
+                                    editor.apply();
+                                    Utils.errMsg(this, "Failed to get " +
+                                            "persistent " +
+                                            "access permissions");
+                                    return;
+                                }
+                                // Persist access permissions.
+                                try {
+                                    this.getContentResolver().takePersistableUriPermission(treeUri,
+                                            Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                                                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                                    // Save the current treeUri as PREF_TREE_URI
+                                    editor.putString(PREF_TREE_URI,
+                                            treeUri.toString());
+                                    editor.apply();
+                                    // Trim the persisted permissions
+                                    UriUtils.trimPermissions(this, 1);
+                                } catch (Exception ex) {
+                                    String msg = "Failed to " +
+                                            "takePersistableUriPermission for "
+                                            + treeUri.getPath();
+                                    Utils.excMsg(this, msg, ex);
+                                }
+                                Log.d(TAG,
+                                        "Current permissions (final): "
+                                                + UriUtils.getNPersistedPermissions(this));
                             }
-                            // Persist access permissions.
-                            try {
-                                this.getContentResolver().takePersistableUriPermission(treeUri,
-                                        Intent.FLAG_GRANT_READ_URI_PERMISSION |
-                                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                                // Save the current treeUri as PREF_TREE_URI
-                                editor.putString(PREF_TREE_URI,
-                                        treeUri.toString());
-                                editor.apply();
-                                // Trim the persisted permissions
-                                UriUtils.trimPermissions(this, 1);
-                            } catch (Exception ex) {
-                                String msg = "Failed to " +
-                                        "takePersistableUriPermission for "
-                                        + treeUri.getPath();
-                                Utils.excMsg(this, msg, ex);
-                            }
-                            Log.d(TAG,
-                                    "Current permissions (final): "
-                                            + UriUtils.getNPersistedPermissions(this));
+                        } catch (Exception ex) {
+                            Log.e(TAG, "Error in openDocumentTreeLauncher: " +
+                                    "startActivity for result", ex);
                         }
                     });
-
-//    // Used in Logging
-//    private long ecgTime0;
-//    private long redrawTime0;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         Log.d(TAG, this.getClass().getSimpleName() + " onCreate");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_ecg);
-        mLayoutTop = findViewById(R.id.top);
-        mLayoutEcg = findViewById(R.id.ecg);
-        mLayoutAnalysis = findViewById(R.id.analysis);
         mTextViewHR = findViewById(R.id.hr);
         mTextViewInfo = findViewById(R.id.info);
         mTextViewTime = findViewById(R.id.time);
@@ -206,12 +199,6 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             mQRSPlot.setVisibility(View.GONE);
             ConstraintLayout constraintLayout = findViewById(R.id.analysis);
             constraintLayout.setVisibility(View.GONE);
-//            // Reset the weights
-//            constraintLayout = findViewById(R.id.top);
-//            ConstraintSet constraintSet = new ConstraintSet();
-//            constraintSet.clone(constraintLayout);
-//            constraintSet.setVerticalWeight(R.id.ecg, 0.7f);
-//            constraintSet.setVerticalWeight(R.id.hr, 0.3f);
         }
 
         mSharedPreferences = getPreferences(MODE_PRIVATE);
@@ -246,8 +233,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
 
     @Override
     public void onResume() {
-        Log.v(TAG, this.getClass().getSimpleName() + " onResume:"
-                + " mOrientationChanged=" + mOrientationChanged);
+        Log.v(TAG, this.getClass().getSimpleName() + " onResume:");
         super.onResume();
 
         // Check if PREF_TREE_URI is valid and remove it id not
@@ -263,9 +249,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         invalidateOptionsMenu();
 
         // Setup the plots if not done
-        Log.d(TAG,
-                "    mECGPlotter=" + mECGPlotter + " mHRPlotter=" + mHRPlotter
-                        + " mQRSPlotter=" + mQRSPlotter);
+//        Log.d(TAG,
+//                "    mECGPlotter=" + mECGPlotter + " mHRPlotter=" + mHRPlotter
+//                        + " mQRSPlotter=" + mQRSPlotter);
         if (mECGPlotter == null) {
             mECGPlot.post(() -> mECGPlotter =
                     new ECGPlotter(this, mECGPlot,
@@ -273,12 +259,11 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         }
         if (mHRPlotter == null) {
             mHRPlot.post(() -> mHRPlotter =
-                    new HRPlotter(this, mHRPlot,
-                            "HR-RR", false));
+                    new HRPlotter(this, mHRPlot, false));
         }
         if (mQRSPlotter == null) {
             mQRSPlot.post(() -> mQRSPlotter =
-                    new QRSPlotter(this, mQRSPlot, "HR-RR"));
+                    new QRSPlotter(this, mQRSPlot));
         }
 
         // Start the connection to the device
@@ -347,7 +332,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 mStopHR = mTextViewHR.getText().toString();
                 mStopTime = new Date();
                 mPlaying = false;
-                allowPan(true);
+                setPanBehavior();
                 if (mEcgDisposable != null) {
                     // Turns it off
                     streamECG();
@@ -366,7 +351,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 mStopHR = mTextViewHR.getText().toString();
                 mStopTime = new Date();
                 mPlaying = true;
-                allowPan(false);
+                setPanBehavior();
                 mTextViewTime.setText(getString(R.string.elapsed_time,
                         0.0));
                 // Clear the plot
@@ -416,7 +401,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
             chooseDataDirectory();
             return true;
         }
-            return false;
+        return false;
     }
 
     /**
@@ -426,30 +411,21 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
      * in AndroidManifest for the Activity.  With this set onPause and
      * onResume are not called, only this.  Otherwise orientation changes
      * cause it to start over with onCreate.  <br><br>
-     * The screen orientation changes have not been made yet, so anything
-     * relying on them must be done later.
      *
      * @param newConfig The new configuration.
      */
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
-        Log.v(TAG, this.getClass().getSimpleName() +
+        Log.d(TAG, this.getClass().getSimpleName() +
                 " onConfigurationChanged: "
                 + (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE ?
                 "Landscape" : "Portrait")
-                + " time=" + ECGPlotter.sdfshort.format(new Date())
+                + " time=" + sdfshort.format(new Date())
         );
         super.onConfigurationChanged(newConfig);
-        int orientation = newConfig.orientation;
-        mOrientationChanged = mOrientationChangedECG =
-                mOrientationChangedQRS = true;
+        mOrientationChangedECG = mOrientationChangedQRS =
+                mOrientationChangedHR = true;
 
-        ConstraintLayout topOld = mLayoutTop;
-        ConstraintLayout ecgOld = mLayoutEcg;
-        ConstraintLayout analysisOld = mLayoutAnalysis;
-        XYPlot ecgplotOld = mECGPlot;
-        XYPlot qrsplotOld = mQRSPlot;
-        XYPlot hrplotOld = mHRPlot;
         TextView hrOld = mTextViewHR;
         TextView timeOld = mTextViewTime;
         TextView infoOld = mTextViewInfo;
@@ -459,161 +435,67 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         setContentView(R.layout.activity_ecg);
 
         // At this point the new layouts should be correct but they have
-        // undefined Views.  We need to replace the views with the old ones.
-        ConstraintLayout topNew = findViewById(R.id.top);
-        ConstraintLayout ecgNew = findViewById(R.id.ecg);
-        ConstraintLayout analysisNew = findViewById(R.id.analysis);
-        XYPlot ecgplotNew = findViewById(R.id.ecgplot);
-        XYPlot qrsplotNew = findViewById(R.id.qrsplot);
-        XYPlot hrplotNew = findViewById(R.id.hrplot);
-        TextView hrNew = findViewById(R.id.hr);
-        TextView timeNew = findViewById(R.id.time);
-        TextView infoNew = findViewById(R.id.info);
-
-        // ecg
-        replaceView(ecgplotOld, ecgplotNew, ecgOld, ecgNew);
-        ecgplotNew = findViewById(R.id.ecgplot);
-        replaceView(hrOld, hrNew, ecgOld, ecgNew);
-        hrNew = findViewById(R.id.hr);
-        replaceView(infoOld, infoNew, ecgOld, ecgNew);
-        infoNew = findViewById(R.id.info);
-        replaceView(timeOld, timeNew, ecgOld, ecgNew);
-        timeNew = findViewById(R.id.time);
-
-        // analysis
-        replaceView(qrsplotOld, qrsplotNew, analysisOld, analysisNew);
-        qrsplotNew = findViewById(R.id.qrsplot);
-        replaceView(hrplotOld, hrplotNew, analysisOld, analysisNew);
-        hrplotNew = findViewById(R.id.hrplot);
-
-        Log.d(TAG, "after replaceView calls: time="
-                + ECGPlotter.sdfshort.format(new Date()));
-
-        // Get the new ids from the resources
-        // (These should the same as the new values)
-        mLayoutTop = findViewById(R.id.top);
-        mLayoutEcg = findViewById(R.id.ecg);
-        mLayoutAnalysis = findViewById(R.id.analysis);
+        // undefined Views.
         mECGPlot = findViewById(R.id.ecgplot);
         mQRSPlot = findViewById(R.id.qrsplot);
         mHRPlot = findViewById(R.id.hrplot);
         mTextViewHR = findViewById(R.id.hr);
         mTextViewTime = findViewById(R.id.time);
         mTextViewInfo = findViewById(R.id.info);
-//        Log.d(TAG, "After mLayoutEcg=" + getHashCode(mLayoutEcg)
-//                +  " mLayoutAnalysis=" + getHashCode(mLayoutAnalysis)
-//                + " mTextViewHR=" + getHashCode(mTextViewHR)
-//                + " mTextViewTime=" + getHashCode(mTextViewTime)
-//                + " mLayoutTop=" + getHashCode(mLayoutTop)
-//        );
-//        Log.d(TAG, "After: ecgplot: old=" + getHashCode(ecgOld)
-//                +  " new=" + getHashCode(ecgplotNew)
-//                +  " final=" + getHashCode(mECGPlot)
-//        );
-//        Log.d(TAG, "After: qrsplot: old=" + getHashCode(qrsplotOld)
-//                +  " new=" + getHashCode(qrsplotNew)
-//                +  " final=" + getHashCode(mQRSPlot)
-//        );
-//        Log.d(TAG, "After: hrplot: old=" + getHashCode(hrplotOld)
-//                +  " new=" + getHashCode(hrplotNew)
-//                +  " final=" + getHashCode(mHRPlot)
-//        );
 
-//        // Mark the plots as needing to be laid out
-//        mECGPlot.invalidate();
-//        mECGPlot.requestLayout();
-//        mQRSPlot.invalidate();
-//        mQRSPlot.requestLayout();
-//        mHRPlot.invalidate();
-//        mHRPlot.requestLayout();
+        // Set the panning behavior in the new plots.
+        setPanBehavior();
 
-        // Set the plots invisible to avid flashing
-        mECGPlot.setVisibility(View.INVISIBLE);
+        // ecg
+        mECGPlot.post(() -> {
+            mTextViewHR.setText(hrOld.getText());
+            mTextViewTime.setText(timeOld.getText());
+            mTextViewInfo.setText(infoOld.getText());
+//            Log.d(TAG, "mECGPlot.post (before): time="
+//                    + sdfshort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mECGPlotter)
+//                    + " plot=" + Utils.getHashCode(mECGPlot)
+//                    + " isLaidOut=" + mECGPlot.isLaidOut()
+//            );
+            mECGPlotter = mECGPlotter.getNewInstance(mECGPlot);
+            mOrientationChangedECG = false;
+//            Log.d(TAG, "mECGPlot.post (after): time="
+//                    + sdfshort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mECGPlotter)
+//                    + " plot=" + Utils.getHashCode(mECGPlot)
+        });
 
-        // Update the mPlot instances in the plotters
-        mECGPlotter.resetPlotInstance(mECGPlot);
-        mQRSPlotter.resetPlot(mQRSPlot);
-        mHRPlotter.resetPlot(mHRPlot);
-
-        Log.d(TAG, "after resetPlotInstance calls, before handler calls: time="
-                + ECGPlotter.sdfshort.format(new Date()));
-
-
-//        Log.d(TAG, "setupPlot 1 started: time="
-//                + ECGPlotter.sdfshort.format(new Date()));
-//        mECGPlotter.setupPlot();
-
-        // Post a Runnable to have plots to be setup again in 1 sec
-        final Handler handler = new Handler();
-//        handler.postDelayed(() -> {
-//            Log.d(TAG, "setupPlot 2 started: time="
-//                    + ECGPlotter.sdfshort.format(new Date()));
-//            mECGPlotter.setupPlot();
-//            mQRSPlotter.setupPlot();
-//            mHRPlotter.setupPlot();
-//        }, 1);
-        handler.postDelayed(() -> {
-            Log.d(TAG, "setupPlot 3 started: time="
-                    + ECGPlotter.sdfshort.format(new Date()));
-            mECGPlotter.setupPlot();
-            mQRSPlotter.setupPlot();
-            mHRPlotter.setupPlot();
-            handler.postDelayed(() -> {
-                Log.d(TAG, "reset mOrientationChanged: time="
-                        + ECGPlotter.sdfshort.format(new Date()));
-                mOrientationChanged = mOrientationChangedECG = mOrientationChangedQRS = false;
-                mECGPlot.setVisibility(View.VISIBLE);
-            }, 1000);
-        }, 1000);
-    }
-
-    /**
-     * Replaces the View in the new Layout with the View from the old Layout.
-     *
-     * @param oldView   The old view.
-     * @param newView   The new view.
-     * @param oldLayout The old Layout. (The View has to be unparented.)
-     * @param newLayout Ghe new Layout.
-     */
-    private void replaceView(View oldView, View newView,
-                             ConstraintLayout oldLayout,
-                             ConstraintLayout newLayout) {
-        try {
-            ConstraintLayout.LayoutParams newParams =
-                    (ConstraintLayout.LayoutParams) newView.getLayoutParams();
-            newLayout.removeView(newView);
-            oldLayout.removeView(oldView);
-            newLayout.addView(oldView, newParams);
-        } catch (Exception ex) {
-            String parentStr = "Parent NA";
-            if (oldView.getParent() instanceof View) {
-                parentStr = getViewInfo((View) oldView.getParent(), "parent");
-            }
-            String msg = "Error replacing view: \n"
-                    + getViewInfo(oldView, "oldView") + "\n"
-                    + getViewInfo(newView, "newView") + "\n"
-                    + getViewInfo(oldLayout, "oldLayout") + "\n"
-                    + getViewInfo(newLayout, "newLayout") + "\n"
-                    + parentStr + "\n";
-            Utils.excMsg(this, "Error replacing view", ex);
-            Log.e(TAG, "Error replacing view: \n"
-                            + getViewInfo(oldView, "oldView") + "\n"
-                            + getViewInfo(newView, "newView") + "\n"
-                            + getViewInfo(oldLayout, "oldLayout") + "\n"
-                            + getViewInfo(newLayout, "newLayout") + "\n"
-                            + parentStr + "\n"
-                    , ex);
-        }
-    }
-
-    /**
-     * Utility method for printing a hash code in hex.
-     *
-     * @param obj The object whose hash code is desired.
-     * @return The hex-formatted hash code.
-     */
-    public String getHashCode(Object obj) {
-        return String.format("%08X", obj.hashCode());
+        // analysis
+        mQRSPlot.post(() -> {
+//            Log.d(TAG, "mQRSPlot.post (before): time="
+//                    + sdfshort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mQRSPlotter)
+//                    + " plot=" + Utils.getHashCode(mQRSPlot)
+//                    + " isLaidOut=" + mQRSPlot.isLaidOut()
+//            );
+            mQRSPlotter = mQRSPlotter.getNewInstance(mQRSPlot);
+            mOrientationChangedQRS = false;
+//            Log.d(TAG, "mQRSPlot.post (after): time="
+//                    + sdfshort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mQRSPlotter)
+//                    + " plot=" + Utils.getHashCode(mQRSPlot)
+//            );
+        });
+        mHRPlot.post(() -> {
+//            Log.d(TAG, "mHRPlot.post (before): time="
+//                    + sdfshort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mHRPlotter)
+//                    + " plot=" + Utils.getHashCode(mHRPlot)
+//                    + " isLaidOut=" + mHRPlot.isLaidOut()
+//            );
+            mHRPlotter = mHRPlotter.getNewInstance(mHRPlot);
+            mOrientationChangedHR = false;
+//            Log.d(TAG, "mHRPlot.post (after): time="
+//                    + sdfshort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mHRPlotter)
+//                    + " plot=" + Utils.getHashCode(mHRPlot)
+//            );
+        });
     }
 
     /**
@@ -629,12 +511,13 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
     /**
      * Get info for a view, including the id, name, and hash code.
      *
-     * @param view
+     * @param view The view.
      * @param tag  User-supplied tag, preferably <= 8 characters.
      * @return The info.
      */
+    @SuppressWarnings("unused")
     public String getViewInfo(View view, String tag) {
-        String hash = getHashCode(view);
+        String hash = Utils.getHashCode(view);
         String id = getViewId(view);
         String name = view.getClass().getSimpleName();
         return String.format("%-8s %-8s %-20s %8s", id, tag, name, hash);
@@ -660,8 +543,6 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 + " ACCESS_LOCATION_REQ="
                 + REQ_ACCESS_LOCATION
         );
-//        switch (requestCode) {
-//        }
     }
 
     public void selectDeviceId() {
@@ -817,43 +698,25 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         editor.apply();
     }
 
-//    public void resetPlotInstance(int samplingRate) {
-//        mSamplingRate = samplingRate;
-//        mNLarge = (int) Math.round(.2 * samplingRate);
-//        mNTotalPoints = 150 * mNLarge;
-//        mNPlotPoints = 20 * mNLarge;
-//        mECGPlot.post(() -> {
-//            mECGPlotter =
-//                    new ECGPlotter(this, mECGPlot,
-//                            "PPG", Color.RED, false);
-//        });
-//    }
-
-    private void allowPan(boolean allow) {
+    /**
+     * Panning while collecting data causes problems. Turn it off when
+     * playing and turn it on with stopped. Zooming is not enabled.
+     */
+    private void setPanBehavior() {
         // ECG
-        if (allow) {
-            PanZoom.attach(mECGPlot, PanZoom.Pan.HORIZONTAL,
-                    PanZoom.Zoom.NONE);
-        } else {
+        if (mPlaying) {
+            // Don't allow
             PanZoom.attach(mECGPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
-        }
-        // HR
-        if (allow) {
-            PanZoom.attach(mHRPlot, PanZoom.Pan.HORIZONTAL,
-                    PanZoom.Zoom.NONE);
-        } else {
             PanZoom.attach(mHRPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
+            PanZoom.attach(mQRSPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
+        } else {
+            // Allow
+            PanZoom.attach(mECGPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
+//            PanZoom.attach(mHRPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom
+//            .NONE);
+            PanZoom.attach(mHRPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
+            PanZoom.attach(mQRSPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
         }
-        // QRS
-        if (mUseQRSPlot) {
-            if (allow) {
-                PanZoom.attach(mQRSPlot, PanZoom.Pan.HORIZONTAL,
-                        PanZoom.Zoom.NONE);
-            } else {
-                PanZoom.attach(mQRSPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
-            }
-        }
-
     }
 
     /**
@@ -949,7 +812,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                         mECGPlotter.getSeries().getyVals();
                 final int nSamples = vals.size();
                 Bitmap bm = EcgImage.createImage(this,
-                        mSamplingRate,
+                        FS,
                         mStopTime.toString(),
                         mDeviceId,
                         mFirmware,
@@ -957,7 +820,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                         note,
                         mStopHR,
                         String.format(Locale.US, "%.1f " +
-                                "sec", nSamples / (double) mSamplingRate),
+                                "sec", nSamples / FS),
                         vals);
                 bm.compress(Bitmap.CompressFormat.PNG, 80, strm);
                 strm.close();
@@ -1013,10 +876,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 // Write samples
                 LinkedList<Number> vals = mECGPlotter.getSeries().getyVals();
                 int nSamples = vals.size();
-                out.write(nSamples + " values " + String.format(Locale.US
-                        , "%" +
-                                ".1f " +
-                                "sec\n", nSamples / (double) mSamplingRate));
+                out.write(nSamples + " values " + String.format(Locale.US,
+                        "%.1f sec\n", nSamples / FS));
                 for (Number val : vals) {
                     out.write(String.format(Locale.US, "%.3f\n",
                             val.doubleValue()));
@@ -1110,8 +971,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                 "\n");
         if (mECGPlotter != null && mECGPlotter.getSeries() !=
                 null && mECGPlotter.getSeries().getyVals() != null) {
-            double elapsed =
-                    mECGPlotter.getDataIndex() / (double) mSamplingRate;
+            double elapsed = mECGPlotter.getDataIndex() / FS;
             msg.append("Elapsed Time: ")
                     .append(getString(R.string.elapsed_time, elapsed)).append("\n");
             msg.append("Points plotted: ")
@@ -1174,9 +1034,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
                             .subscribe(polarEcgData -> {
 //                                        logTimestampInfo(polarEcgData);
                                         if (mQRS == null) {
-                                            mQRS = new QRSDetection(ECGActivity.this,
-                                                    mECGPlotter, mHRPlotter,
-                                                    mQRSPlotter);
+                                            mQRS = new QRSDetection(ECGActivity.this);
                                         }
 //                                        logEcgDataInfo(polarEcgData);
                                         mQRS.process(polarEcgData);
@@ -1216,14 +1074,16 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         try {
             Date epoch = sdf.parse("01:01:2000 00:00:00");
             Date epoch1 = sdf.parse("01:01:2019 00:00:00");
-//            Log.d(TAG, "epoch=" + epoch + " " + epoch.getTime()
-//                    + " epoch1=" + epoch1 + " " + epoch1.getTime());
-            Log.d(TAG, "epoch=" + sdf2.format(epoch)
-                    + " epoch1=" + sdf2.format(epoch1)
-                    + " " + epoch.getTime()
-                    + " " + epoch1.getTime()
-                    + " " + (epoch1.getTime() - epoch.getTime())
-                    + tzString);
+            if (epoch != null && epoch1 != null) {
+                Log.d(TAG, "epoch=" + sdf2.format(epoch)
+                        + " epoch1=" + sdf2.format(epoch1)
+                        + " " + epoch.getTime()
+                        + " " + epoch1.getTime()
+                        + " " + (epoch1.getTime() - epoch.getTime())
+                        + tzString);
+            } else {
+                Log.d(TAG, "epoch=null and/or epoch2=null");
+            }
         } catch (
                 Exception ex) {
             Log.e(TAG, "Error parsing date", ex);
@@ -1316,9 +1176,6 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION &
                 Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-//        intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, uriToLoad);
-//        // Deprecated
-//        startActivityForResult(intent, REQ_GET_TREE);
         openDocumentTreeLauncher.launch(intent);
     }
 
@@ -1344,59 +1201,6 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         Toast.makeText(this,
                 getString(R.string.connecting) + " " + mDeviceId,
                 Toast.LENGTH_SHORT).show();
-        // Add listeners to handle orientation change
-        Log.d(TAG, "    adding PlotListner mECGPlotListener=" + mECGPlotListener);
-        if (mECGPlotListener != null) {
-            mECGPlot.removeListener(mECGPlotListener);
-            mECGPlotListener = null;
-        }
-        mECGPlotListener = new PlotListener() {
-            @Override
-            public void onBeforeDraw(Plot source, Canvas canvas) {
-                if (mOrientationChangedECG) {
-                    Log.d(TAG, "onBeforeDraw: " + ECGPlotter.sdfshort.format(new Date()));
-                }
-            }
-
-            @Override
-            public void onAfterDraw(Plot source, Canvas canvas) {
-//                long now = new Date().getTime();
-//                Log.d(TAG,
-//                        "onAfterDraw: ,=" +
-//                        mOrientationChanged +
-//                                " deltaT=" + (now - redrawTime0));
-//                redrawTime0 = now;
-            }
-        };
-        mECGPlot.addListener(mECGPlotListener);
-//
-//        if (mQRSPlotListener != null) {
-//            mQRSPlot.removeListener(mQRSPlotListener);
-//            mQRSPlotListener = null;
-//        }
-//        mQRSPlotListener = new PlotListener() {
-//            @Override
-//            public void onBeforeDraw(Plot source, Canvas canvas) {
-//            }
-//
-//            @Override
-//            public void onAfterDraw(Plot source, Canvas canvas) {
-////                long now = new Date().getTime();
-////                Log.d(TAG,
-////                        "onAfterDraw: ,=" +
-////                        mOrientationChanged +
-////                                " deltaT=" + (now - redrawTime0));
-////                redrawTime0 = now;
-//                if (mOrientationChangedQRS) {
-//                    mOrientationChangedQRS = false;
-//                    Log.d(TAG, "onAfterDraw: orientation changed");
-//                    mQRSPlotter.setupPlot();
-//                    mOrientationChanged =
-//                            mOrientationChangedECG || mOrientationChangedQRS;
-//                }
-//            }
-//        };
-//        mQRSPlot.addListener(mQRSPlotListener);
 
         mApi = PolarBleApiDefaultImpl.defaultImplementation(this,
                 PolarBleApi.FEATURE_POLAR_SENSOR_STREAMING |
@@ -1506,7 +1310,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants {
         Log.d(TAG, "    restart(end) mApi=" + mApi + " mPlaying=" + mPlaying);
     }
 
-    public class DeviceInfo {
+    public static class DeviceInfo {
         public String name;
         public String id;
 

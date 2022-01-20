@@ -35,7 +35,7 @@ class EcgImage {
     private static final float OUTLINE_WIDTH = 5f;
     private static final float CURVE_WIDTH = 3f;
 
-    static Bitmap createImage(Context context, int samplingRate, String date,
+    static Bitmap createImage(Context context, double samplingRate, String date,
                               String id,
                               String firmware,
                               String batteryLevel,
@@ -165,7 +165,7 @@ class EcgImage {
         float x0 = 0, x;
         float offsetX = GRAPH_X;
         float offsetY = GRAPH_Y + 30;
-        float valueStep = 200.f / (samplingRate * 8);
+        float valueStep = 200.f / ((float)samplingRate * 8);
         for (Number val : vals) {
             x = index * valueStep;
             y = -10.f * val.floatValue();

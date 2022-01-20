@@ -6,9 +6,12 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 
+import com.androidplot.Plot;
+import com.androidplot.util.DisplayDimensions;
 import com.androidplot.util.PixelUtils;
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
+import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
@@ -16,57 +19,103 @@ import com.androidplot.xy.XYPlot;
 import com.androidplot.xy.XYRegionFormatter;
 import com.androidplot.xy.XYSeriesFormatter;
 
+import java.util.Date;
+import java.util.Locale;
+
 @SuppressWarnings("WeakerAccess")
 public class QRSPlotter implements IConstants, IQRSConstants {
-    private final ECGActivity activity;
+    private ECGActivity mActivity;
     private XYPlot mPlot;
 
-    private final XYSeriesFormatter<XYRegionFormatter> mFormatter1;
-    private final SimpleXYSeries mSeries1;
-    private final XYSeriesFormatter<XYRegionFormatter> mFormatter2;
-    private final SimpleXYSeries mSeries2;
-    private final XYSeriesFormatter<XYRegionFormatter> mFormatter3;
-    private final SimpleXYSeries mSeries3;
-    private final XYSeriesFormatter<XYRegionFormatter> mFormatter4;
-    private final SimpleXYSeries mSeries4;
+    private XYSeriesFormatter<XYRegionFormatter> mFormatter1;
+    private SimpleXYSeries mSeries1;
+    private XYSeriesFormatter<XYRegionFormatter> mFormatter2;
+    private SimpleXYSeries mSeries2;
+    private XYSeriesFormatter<XYRegionFormatter> mFormatter3;
+    private SimpleXYSeries mSeries3;
+    private XYSeriesFormatter<XYRegionFormatter> mFormatter4;
+    private SimpleXYSeries mSeries4;
 
     /**
      * The next index in the data
      */
     private long mDataIndex;
 
-    public QRSPlotter(ECGActivity activity, XYPlot plot, String title) {
+    /**
+     * CTOR that just sets the plot.
+     *
+     * @param plot The XYPlot.
+     */
+    public QRSPlotter(XYPlot plot) {
+        this.mPlot = plot;
+        // Don't do anything else
+    }
+
+    public QRSPlotter(ECGActivity activity, XYPlot plot) {
         Log.d(TAG, this.getClass().getSimpleName() + " QRSPlotter CTOR");
-        // This is the activity, needed for resources
-        this.activity = activity;
+        // This is the mActivity, needed for resources
+        this.mActivity = activity;
         this.mPlot = plot;
         this.mDataIndex = 0;
 
         mFormatter1 = new LineAndPointFormatter(Color.rgb(0, 153, 255),
                 null, null, null);
         mFormatter1.setLegendIconEnabled(false);
-        mSeries1 = new SimpleXYSeries(title);
+        mSeries1 = new SimpleXYSeries("Series 1");
         mPlot.addSeries(mSeries1, mFormatter1);
 
         mFormatter2 = new LineAndPointFormatter(Color.YELLOW,
                 null, null, null);
         mFormatter2.setLegendIconEnabled(false);
-        mSeries2 = new SimpleXYSeries(title);
+        mSeries2 = new SimpleXYSeries("Series 2");
         mPlot.addSeries(mSeries2, mFormatter2);
 
         mFormatter3 = new LineAndPointFormatter(Color.GREEN,
                 null, null, null);
         mFormatter3.setLegendIconEnabled(false);
-        mSeries3 = new SimpleXYSeries(title);
+        mSeries3 = new SimpleXYSeries("Series 3");
         mPlot.addSeries(mSeries3, mFormatter3);
 
         mFormatter4 = new LineAndPointFormatter(null,
                 Color.RED, null, null);
         mFormatter4.setLegendIconEnabled(false);
-        mSeries4 = new SimpleXYSeries(title);
+        mSeries4 = new SimpleXYSeries("Series 4");
         mPlot.addSeries(mSeries4, mFormatter4);
 
         setupPlot();
+    }
+
+    /**
+     * Get a new QRSPLotter instance, using the given XYPlot but other values
+     * from the current one. Use for replacing the current plotter.
+     *
+     * @param plot The XYPLot.
+     * @return The new instance.
+     */
+    public QRSPlotter getNewInstance(XYPlot plot) {
+        QRSPlotter newPlotter = new QRSPlotter(plot);
+        newPlotter.mPlot = plot;
+        newPlotter.mActivity = this.mActivity;
+        newPlotter.mDataIndex = this.mDataIndex;
+
+        newPlotter.mFormatter1 = this.mFormatter1;
+        newPlotter.mSeries1 = this.mSeries1;
+        newPlotter.mPlot.addSeries(mSeries1, mFormatter1);
+
+        newPlotter.mFormatter2 = this.mFormatter2;
+        newPlotter.mSeries2 = this.mSeries2;
+        newPlotter.mPlot.addSeries(mSeries2, mFormatter2);
+
+        newPlotter.mFormatter3 = this.mFormatter3;
+        newPlotter.mSeries3 = this.mSeries3;
+        newPlotter.mPlot.addSeries(mSeries3, mFormatter3);
+
+        newPlotter.mFormatter4 = this.mFormatter4;
+        newPlotter.mSeries4 = this.mSeries4;
+        newPlotter.mPlot.addSeries(mSeries3, mFormatter3);
+
+        newPlotter.setupPlot();
+        return newPlotter;
     }
 
     /**
@@ -81,22 +130,18 @@ public class QRSPlotter implements IConstants, IQRSConstants {
         // Using .5 mV and nLarge / samplingRate for total grid size
         // rMax is half the total, rMax at top and -rMax at bottom
         RectF gridRect = mPlot.getGraph().getGridRect();
+        // Note different from ECG plot
         double rMax =
-                // Note different from ECG plot
                 .125 * (gridRect.bottom - gridRect.top) * N_ECG_PLOT_POINTS /
                         N_LARGE / (gridRect.right - gridRect.left);
-        // Round it to one decimal point
-        rMax = Math.round(rMax * 10) / 10.;
-//        Log.d(TAG, "    rMax = " + rMax);
-//        Log.d(TAG, "    gridRect LRTB=" + gridRect.left + "," + gridRect.right +
-//                "," + gridRect.top + "," + gridRect.bottom);
-//        Log.d(TAG, "    gridRect width=" + (gridRect.right - gridRect.left) +
-//                " height=" + (gridRect.bottom - gridRect.top));
-//        DisplayMetrics displayMetrics = activity.getResources()
-//                .getDisplayMetrics();
-//        Log.d(TAG, "    display widthPixels=" + displayMetrics.widthPixels +
-//                " heightPixels=" + displayMetrics.heightPixels);
 
+        // None is the default, but set it explicitly anyway
+        mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
+
+        // Set the domain boundaries (range boundaries are fixed)
+        updateDomainBoundaries();
+
+        // Range
         mPlot.setRangeBoundaries(-rMax, rMax, BoundaryMode.FIXED);
         // Set the range block to be .1 mV so a large block will be .5 mV
         mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, .5);
@@ -108,17 +153,107 @@ public class QRSPlotter implements IConstants, IQRSConstants {
         mPlot.getGraph().getRangeOriginLinePaint().setColor(color);
         mPlot.getGraph().getRangeOriginLinePaint().setStrokeWidth(
                 PixelUtils.dpToPix(1.5f));
-        mPlot.setDomainBoundaries(-N_ECG_PLOT_POINTS, 0, BoundaryMode.FIXED);
+
+        // Domain
+        updateDomainBoundaries();
         // Set the domain block to be .2 * N_LARGE so large block will be
         // nLarge samples
-        mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL,
-                N_LARGE);
-//        mPlot.setLinesPerDomainLabel(5);
+        mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL, N_LARGE);
 
-        mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.NONE);
+//        // Allow panning
+//        PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
+
+//        // Debug
+//        Log.d(TAG, this.getClass().getSimpleName()
+//                + " setupPlot: Before update\n" + getLogInfo(rMax));
 
         // Update the plot
         update();
+    }
+
+    public String getLogInfo(double rMax) {
+        RectF gridRect = mPlot.getGraph().getGridRect();
+        StringBuilder sb = new StringBuilder();
+        sb.append("    renderMode=").append(mPlot.getRenderMode()
+                == Plot.RenderMode.USE_MAIN_THREAD ? "Main" : "Background")
+                .append("\n");
+        DisplayDimensions dims = mPlot.getDisplayDimensions();
+        sb.append("    view LRTB=").append(mPlot.getLeft()).append(",").
+                append(mPlot.getRight()).append(",")
+                .append(mPlot.getTop()
+                ).append(",").append(mPlot.getBottom()).append("\n");
+        sb.append("    canvasRect LRTB=").append(dims.canvasRect.left)
+                .append(",").append(dims.canvasRect.right)
+                .append(",").append(dims.canvasRect.top)
+                .append(",").append(dims.canvasRect.bottom)
+                .append("\n");
+        sb.append("    marginatedRect LRTB=").append(dims.marginatedRect.left)
+                .append(",").append(dims.marginatedRect.right).append(",")
+                .append(dims.marginatedRect.top).append(",")
+                .append(dims.marginatedRect.bottom).append("\n");
+        sb.append("    paddedRect LRTB=")
+                .append(dims.paddedRect.left).append(",")
+                .append(dims.paddedRect.right).append(",")
+                .append(dims.paddedRect.top).append(",").
+                append(dims.paddedRect.bottom).append("\n");
+        sb.append("    gridRect LRTB=").append(gridRect.left).append(",")
+                .append(gridRect.right).append(",")
+                .append(gridRect.top).append(",").append(gridRect.bottom)
+                .append("\n");
+        sb.append("    gridRect width=").append(gridRect.width())
+                .append(" height=").append(gridRect.height()).append("\n");
+        DisplayMetrics displayMetrics = mActivity.getResources()
+                .getDisplayMetrics();
+        sb.append("    display widthPixels=").append(displayMetrics.widthPixels)
+                .append(" heightPixels=").append(displayMetrics.heightPixels)
+                .append("\n");
+        sb.append("    rMax = ").append(rMax).append("\n");
+        sb.append(String.format(Locale.US,
+                "    Range: min=%.3f step=%.3f max=%.3f origin=%.3f",
+                mPlot.getBounds().getMinY().doubleValue(),
+                mPlot.getRangeStepValue(),
+                mPlot.getBounds().getMaxY().doubleValue(),
+                mPlot.getRangeOrigin().doubleValue())).append("\n");
+        sb.append(String.format(Locale.US,
+                "    Domain: min=%.3f step=%.3f max=%.3f origin=%.3f",
+                mPlot.getBounds().getMinX().doubleValue(),
+                mPlot.getDomainStepValue(),
+                mPlot.getBounds().getMaxX().doubleValue(),
+                mPlot.getDomainOrigin().doubleValue())).append("\n");
+        sb.append("    innerLimits min,max=")
+                .append(mPlot.getInnerLimits().getMinY()).append(",")
+                .append(mPlot.getInnerLimits().getMinY()).append("\n");
+        sb.append("    outerLimits min,max=")
+                .append(mPlot.getOuterLimits().getMinY()).append(",")
+                .append(mPlot.getOuterLimits().getMinY()).append("\n");
+        double screenYMax = mPlot.seriesToScreenY(rMax);
+        double screenYMin = mPlot.seriesToScreenY(-rMax);
+        double screenTop = mPlot.seriesToScreenY(mPlot.getBounds().getMaxY());
+        double screenBottom =
+                mPlot.seriesToScreenY(mPlot.getBounds().getMinY());
+        sb.append("    screenY(rMax)=").append(screenYMax).append(" screenY")
+                .append("(-rMax)=").append(screenYMin)
+                .append(" screenY(top)=").append(screenTop)
+                .append(" screenY(bottom)=").append(screenBottom).append("\n");
+//        sb.append("    layoutRequested=").append(mPlot.isLayoutRequested())
+//                .append(" isLaidOut=").append(mPlot.isLaidOut())
+//                .append(" isInLayout=").append(mPlot.isInLayout())
+//                .append("\n");
+
+        // QRS Specific
+        sb.append("    mDataIndex=").append(mDataIndex)
+                .append(" mSeries: size=").append(mSeries1.getxVals().size())
+                .append(",").append(mSeries2.getxVals().size())
+                .append(",").append(mSeries3.getxVals().size())
+                .append(",").append(mSeries4.getxVals().size()).append("\n");
+        sb.append("    Time=").append(ECGActivity.sdfshort.format(new Date()))
+                .append(" mOrientationChangedQRS=")
+                .append(mActivity.mOrientationChangedQRS)
+                .append(" height=").append(mPlot.getHeight()).append(" " +
+                "isLaidOut=")
+                .append(mPlot.isLaidOut()).append("\n");
+
+        return sb.toString();
     }
 
     /**
@@ -208,8 +343,8 @@ public class QRSPlotter implements IConstants, IQRSConstants {
         //            Log.d(TAG, this.getClass().getSimpleName()
         //                    + " update: thread: " + Thread.currentThread()
         //                    .getName());
-        if(mDataIndex % 73 == 0) {
-            activity.runOnUiThread(mPlot::redraw);
+        if (mDataIndex % 73 == 0) {
+            mActivity.runOnUiThread(mPlot::redraw);
         }
     }
 
@@ -224,14 +359,5 @@ public class QRSPlotter implements IConstants, IQRSConstants {
         mSeries3.clear();
         mSeries4.clear();
         update();
-    }
-
-    public void resetPlot(XYPlot plot) {
-        mPlot = plot;
-        mPlot.clear();
-        mPlot.addSeries(mSeries1, mFormatter1);
-        mPlot.addSeries(mSeries2, mFormatter2);
-        mPlot.addSeries(mSeries3, mFormatter3);
-        mPlot.addSeries(mSeries4, mFormatter4);
     }
 }

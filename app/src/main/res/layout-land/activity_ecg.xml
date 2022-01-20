@@ -14,7 +14,7 @@
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_chainStyle="spread"
-        app:layout_constraintVertical_weight="0.5">
+        app:layout_constraintVertical_weight="0.6">
 
         <com.androidplot.xy.XYPlot
             android:id="@+id/ecgplot"
@@ -102,7 +102,6 @@
             app:backgroundColor="#000000"
             app:domainLineColor="#555555"
             app:domainOriginLineColor="#555555"
-            app:domainTitle="@string/hr_domain_title_sample"
             app:domainTitleTextColor="#FFFFFF"
             app:domainTitleTextSize="14dp"
             app:graphBackgroundColor="#000000"
@@ -114,13 +113,14 @@
             app:gridBackgroundColor="#000000"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintHorizontal_chainStyle="spread"
-            app:layout_constraintHorizontal_weight="0.5"
+            app:layout_constraintHorizontal_weight="0.4"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toLeftOf="@id/hrplot"
             app:layout_constraintTop_toTopOf="parent"
             app:paddingLeft="5dp"
             app:rangeLineColor="#555555"
             app:rangeOriginLineColor="#555555"
+            app:rangeTitle="@string/qrs_range_title"
             app:rangeTitleTextColor="#FFFFFF"
             app:rangeTitleTextSize="14dp"
             app:renderMode="use_background_thread"

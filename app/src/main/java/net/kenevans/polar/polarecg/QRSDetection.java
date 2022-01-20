@@ -9,9 +9,6 @@ import java.util.List;
 public class QRSDetection implements IConstants, IQRSConstants {
 
     private ECGActivity mActivity;
-    private ECGPlotter mECGPlotter;
-    private HRPlotter mHRPlotter;
-    private QRSPlotter mQRSPlotter;
 
     private FixedSizeList<Double> mPeaks = new FixedSizeList<>(DATA_WINDOW);
     private FixedSizeList<Integer> mPeakIndices =
@@ -69,12 +66,8 @@ public class QRSDetection implements IConstants, IQRSConstants {
 
     double threshold;
 
-    public QRSDetection(ECGActivity activity, ECGPlotter ecgPlotter,
-                        HRPlotter hrPlotter, QRSPlotter qrsPlotter) {
+    public QRSDetection(ECGActivity activity) {
         mActivity = activity;
-        mECGPlotter = ecgPlotter;
-        mHRPlotter = hrPlotter;
-        mQRSPlotter = qrsPlotter;
 
         //Initialize movingAverageHeight assuming avg peaks are
         // MOV_AVG_HEIGHT_DEFAULT high. These values will pre-dispose the
@@ -88,7 +81,7 @@ public class QRSDetection implements IConstants, IQRSConstants {
 //        Log.d(TAG, this.getClass().getSimpleName() + " process"
 //                + " thread=" + Thread.currentThread().getName());
         // Update the ECG plot
-        mECGPlotter.addValues(polarEcgData);
+        ecgPlotter().addValues(polarEcgData);
 
         // samples contains the ecgVals values in μV, mv = .001 * μV;
         for (Integer val : polarEcgData.samples) {
@@ -174,16 +167,16 @@ public class QRSDetection implements IConstants, IQRSConstants {
                     movingAverageHr.add(hr);
                     // Wait to start plotting until HR average is well defined
                     if (movingAverageHr.size() >= MOV_AVG_HR_WINDOW) {
-                        mHRPlotter.addValues2(mStartTime + 1000 * mMaxIndex / FS,
+                        hrPlotter().addValues2(mStartTime + 1000 * mMaxIndex / FS,
                                 movingAverageHr.average(), rr);
-                        mHRPlotter.fullUpdate();
+                        hrPlotter().fullUpdate();
                     }
                 }
             }
             // Don't count this one if the interval between R and S is too long
             if (mMaxIndex - mMinIndex <= MAX_QRS_LENGTH) {
                 // Do QRS plot
-                mQRSPlotter.addPeakValue(mMaxIndex, peakEcgVal);
+                qrsPlotter().addPeakValue(mMaxIndex, peakEcgVal);
                 // Recalculate the threshold
                 movingAverageHeight.add(mMaxAvgHeight);
                 threshold = MOV_AVG_HEIGHT_THRESHOLD_FACTOR
@@ -233,7 +226,7 @@ public class QRSDetection implements IConstants, IQRSConstants {
 //        Log.d(TAG, "i=" + i + " " + scoreVal + " mScoring=" + mScoring
 //                + " mScoreStart=" + mScoreStart
 //                + " mScoreEnd=" + mScoreEnd);
-        mQRSPlotter.addValues(ecg, 10 * doubleVal, 0.5 * (double) scoreVal);
+        qrsPlotter().addValues(ecg, 10 * doubleVal, 0.5 * (double) scoreVal);
 //        mQRSPlotter.addValues(ecg, null, 0.5 * (double) scoreVal);
     }
 
@@ -287,5 +280,17 @@ public class QRSDetection implements IConstants, IQRSConstants {
     public int score(double val, double threshold) {
         if (val < threshold) return 0;
         return 1;
+    }
+
+    public ECGPlotter ecgPlotter() {
+        return mActivity.mECGPlotter;
+    }
+
+    public QRSPlotter qrsPlotter() {
+        return mActivity.mQRSPlotter;
+    }
+
+    public HRPlotter hrPlotter() {
+        return mActivity.mHRPlotter;
     }
 }
