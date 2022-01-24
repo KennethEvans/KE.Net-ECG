@@ -44,7 +44,7 @@ interface IQRSConstants {
     /**
      * Moving average HR window size.
      */
-    int MOV_AVG_HR_WINDOW = 10;
+    int MOV_AVG_HR_WINDOW = 25;
     /**
      * Moving average height window size.
      */

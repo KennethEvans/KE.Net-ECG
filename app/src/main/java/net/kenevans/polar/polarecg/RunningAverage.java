@@ -26,6 +26,10 @@ public class RunningAverage {
         return (list.size() == 0) ? 0 : sum / list.size();
     }
 
+    public double sum() {
+        return sum;
+    }
+
     public int size() {
         return list.size();
     }

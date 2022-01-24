@@ -10,12 +10,12 @@ public class QRSDetection implements IConstants, IQRSConstants {
 
     private ECGActivity mActivity;
 
-    private FixedSizeList<Double> mPeaks = new FixedSizeList<>(DATA_WINDOW);
+    private final FixedSizeList<Double> mPeaks = new FixedSizeList<>(DATA_WINDOW);
     private FixedSizeList<Integer> mPeakIndices =
             new FixedSizeList<>(DATA_WINDOW);
-    private FixedSizeList<Double> mMaxAvg = new FixedSizeList<>(DATA_WINDOW);
-    private FixedSizeList<Double> mMaxAvgIndices =
-            new FixedSizeList<>(DATA_WINDOW);
+//    private final FixedSizeList<Double> mMaxAvg = new FixedSizeList<>(DATA_WINDOW);
+//    private final FixedSizeList<Double> mMaxAvgIndices =
+//            new FixedSizeList<>(DATA_WINDOW);
     boolean mScoring = false;
     int mScoreStart = -1;
     int mScoreEnd = -1;
@@ -37,32 +37,39 @@ public class QRSDetection implements IConstants, IQRSConstants {
 
     double mMaxAvgHeight = MOV_AVG_HEIGHT_DEFAULT;
 
-    private FixedSizeList<Double> curButterworth =
+    private final FixedSizeList<Double> curButterworth =
             new FixedSizeList<>(DATA_WINDOW);
-    private FixedSizeList<Double> curDeriv = new FixedSizeList<>(DATA_WINDOW);
-    private FixedSizeList<Double> curSquare = new FixedSizeList<>(DATA_WINDOW);
-    private FixedSizeList<Double> curAvg = new FixedSizeList<>(DATA_WINDOW);
-    private FixedSizeList<Double> curScore = new FixedSizeList<>(DATA_WINDOW);
-    private FixedSizeList<Double> curEcg = new FixedSizeList<>(DATA_WINDOW);
+    private final FixedSizeList<Double> curDeriv = new FixedSizeList<>(DATA_WINDOW);
+    private final FixedSizeList<Double> curSquare = new FixedSizeList<>(DATA_WINDOW);
+    private final FixedSizeList<Double> curAvg = new FixedSizeList<>(DATA_WINDOW);
+//    private FixedSizeList<Double> curScore = new FixedSizeList<>(DATA_WINDOW);
+    private final FixedSizeList<Double> curEcg = new FixedSizeList<>(DATA_WINDOW);
 
-    private List<Double> ecgVals = new ArrayList<>();
+    private final List<Double> ecgVals = new ArrayList<>();
 
     /**
      * Moving average of the data.
      */
-    private RunningAverage movingAverage = new RunningAverage(MOV_AVG_WINDOW);
-
-    /**
-     * Moving average of the HR.
-     */
-    private RunningAverage movingAverageHr =
-            new RunningAverage(MOV_AVG_HR_WINDOW);
+    private final RunningAverage movingAverage = new RunningAverage(MOV_AVG_WINDOW);
 
     /**
      * Moving average of the moving average heights
      */
-    private RunningAverage movingAverageHeight =
+    private final RunningAverage movingAverageHeight =
             new RunningAverage(MOV_AVG_HEIGHT_WINDOW);
+
+//    /**
+//     * Moving average of the HR.  Used to get the HR as 60 * avg(1/RR).
+//     */
+//    private RunningAverage movingAverageHr =
+//            new RunningAverage(MOV_AVG_HR_WINDOW);
+
+    /**
+     * Moving average of the RR. Used to get the HR as 60 / avgRR.
+     */
+    private final RunningAverage movingAverageRr =
+            new RunningAverage(MOV_AVG_HR_WINDOW);
+
 
     double threshold;
 
@@ -144,7 +151,7 @@ public class QRSDetection implements IConstants, IQRSConstants {
         // Base the threshold on the current average of the moving avg heights
         // input.getLast = cur_avg.getLast is the last value of cur_avg
         scoreVal = score(input.getLast(), threshold);
-        curScore.add((double) scoreVal);
+//        curScore.add((double) scoreVal);
         // Process finding the peaks
         if (mScoring && scoreVal == 0) {
             mScoreEnd = i;
@@ -164,11 +171,15 @@ public class QRSDetection implements IConstants, IQRSConstants {
                 rr = 1000 / FS * (mMaxIndex - mPeakIndices.get(mPeaks.size() - 2));
                 hr = 60000. / rr;
                 if (!Double.isInfinite(hr)) {
-                    movingAverageHr.add(hr);
+//                    movingAverageHr.add(hr);
+                    movingAverageRr.add(rr);
                     // Wait to start plotting until HR average is well defined
-                    if (movingAverageHr.size() >= MOV_AVG_HR_WINDOW) {
+                    if (movingAverageRr.size() >= MOV_AVG_HR_WINDOW) {
+//                        hrPlotter().addValues2(mStartTime + 1000 *
+//                        mMaxIndex / FS,
+//                                movingAverageHr.average(), rr);
                         hrPlotter().addValues2(mStartTime + 1000 * mMaxIndex / FS,
-                                movingAverageHr.average(), rr);
+                                60000. / movingAverageRr.average(), rr);
                         hrPlotter().fullUpdate();
                     }
                 }
