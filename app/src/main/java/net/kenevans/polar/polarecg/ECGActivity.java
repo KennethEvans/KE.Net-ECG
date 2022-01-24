@@ -29,7 +29,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.XYPlot;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -75,7 +74,7 @@ import io.reactivex.rxjava3.functions.Function;
 
 public class ECGActivity extends AppCompatActivity implements IConstants,
         IQRSConstants {
-    public static final SimpleDateFormat sdfshort =
+    public static final SimpleDateFormat sdfShort =
             new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
     SharedPreferences mSharedPreferences;
     private static final int MAX_DEVICES = 3;
@@ -93,6 +92,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     public boolean mOrientationChangedQRS = false;
     public boolean mOrientationChangedHR = false;
 
+    private boolean mConnected = false;
+
     //    public boolean useQRSPlotter = true;
     public boolean mUseQRSPlot = true;
 
@@ -106,7 +107,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     private Disposable mEcgDisposable;
     private boolean mPlaying;
     private Menu mMenu;
-    private String mDeviceId = "Unknown";
+    private String mDeviceId = "";
     private String mFirmware = "Unknown";
     private String mName = "Unknown";
     private String mAddress = "Unknown";
@@ -258,8 +259,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                             "ECG", Color.RED, false));
         }
         if (mHRPlotter == null) {
-            mHRPlot.post(() -> mHRPlotter =
-                    new HRPlotter(this, mHRPlot, false));
+            mHRPlot.post(() -> mHRPlotter = new HRPlotter(this, mHRPlot));
         }
         if (mQRSPlotter == null) {
             mQRSPlot.post(() -> mQRSPlotter =
@@ -283,8 +283,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        Log.v(TAG, this.getClass().getSimpleName() + " onCreateOptionsMenu");
-        Log.d(TAG, "    mPlaying=" + mPlaying);
+//        Log.v(TAG, this.getClass().getSimpleName() + " onCreateOptionsMenu");
+//        Log.d(TAG, "    mPlaying=" + mPlaying);
         mMenu = menu;
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main_menu, menu);
@@ -420,7 +420,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 " onConfigurationChanged: "
                 + (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE ?
                 "Landscape" : "Portrait")
-                + " time=" + sdfshort.format(new Date())
+                + " time=" + sdfShort.format(new Date())
         );
         super.onConfigurationChanged(newConfig);
         mOrientationChangedECG = mOrientationChangedQRS =
@@ -443,47 +443,47 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         mTextViewTime = findViewById(R.id.time);
         mTextViewInfo = findViewById(R.id.info);
 
-        // Set the panning behavior in the new plots.
-        setPanBehavior();
-
-        // ecg
+        // Put the old information into the new views
+        // Layout ecg
         mECGPlot.post(() -> {
             mTextViewHR.setText(hrOld.getText());
             mTextViewTime.setText(timeOld.getText());
             mTextViewInfo.setText(infoOld.getText());
 //            Log.d(TAG, "mECGPlot.post (before): time="
-//                    + sdfshort.format(new Date())
+//                    + sdfShort.format(new Date())
 //                    + " plotter=" + Utils.getHashCode(mECGPlotter)
 //                    + " plot=" + Utils.getHashCode(mECGPlot)
 //                    + " isLaidOut=" + mECGPlot.isLaidOut()
 //            );
             mECGPlotter = mECGPlotter.getNewInstance(mECGPlot);
+            mECGPlotter.setPanning(!mPlaying);
             mOrientationChangedECG = false;
 //            Log.d(TAG, "mECGPlot.post (after): time="
-//                    + sdfshort.format(new Date())
+//                    + sdfShort.format(new Date())
 //                    + " plotter=" + Utils.getHashCode(mECGPlotter)
 //                    + " plot=" + Utils.getHashCode(mECGPlot)
         });
 
-        // analysis
+        // Layout analysis
         mQRSPlot.post(() -> {
 //            Log.d(TAG, "mQRSPlot.post (before): time="
-//                    + sdfshort.format(new Date())
+//                    + sdfShort.format(new Date())
 //                    + " plotter=" + Utils.getHashCode(mQRSPlotter)
 //                    + " plot=" + Utils.getHashCode(mQRSPlot)
 //                    + " isLaidOut=" + mQRSPlot.isLaidOut()
 //            );
             mQRSPlotter = mQRSPlotter.getNewInstance(mQRSPlot);
+            mQRSPlotter.setPanning(!mPlaying);
             mOrientationChangedQRS = false;
 //            Log.d(TAG, "mQRSPlot.post (after): time="
-//                    + sdfshort.format(new Date())
+//                    + sdfShort.format(new Date())
 //                    + " plotter=" + Utils.getHashCode(mQRSPlotter)
 //                    + " plot=" + Utils.getHashCode(mQRSPlot)
 //            );
         });
         mHRPlot.post(() -> {
 //            Log.d(TAG, "mHRPlot.post (before): time="
-//                    + sdfshort.format(new Date())
+//                    + sdfShort.format(new Date())
 //                    + " plotter=" + Utils.getHashCode(mHRPlotter)
 //                    + " plot=" + Utils.getHashCode(mHRPlot)
 //                    + " isLaidOut=" + mHRPlot.isLaidOut()
@@ -491,7 +491,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             mHRPlotter = mHRPlotter.getNewInstance(mHRPlot);
             mOrientationChangedHR = false;
 //            Log.d(TAG, "mHRPlot.post (after): time="
-//                    + sdfshort.format(new Date())
+//                    + sdfShort.format(new Date())
 //                    + " plotter=" + Utils.getHashCode(mHRPlotter)
 //                    + " plot=" + Utils.getHashCode(mHRPlot)
 //            );
@@ -570,7 +570,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                             String oldDeviceId = mDeviceId;
                             setDeviceMruPref(deviceInfo);
                             Log.d(TAG, "which=" + which
-                                    + " name=" + deviceInfo.name + " id=" + deviceInfo.id);
+                                    + " name=" + deviceInfo.name + " id="
+                                    + deviceInfo.id);
                             Log.d(TAG,
                                     "selectDeviceId: oldDeviceId=" + oldDeviceId
                                             + " mDeviceId=" + mDeviceId);
@@ -580,13 +581,13 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                                         mApi.disconnectFromDevice(oldDeviceId);
                                     } catch (PolarInvalidArgument ex) {
                                         String msg = "disconnectFromDevice: " +
-                                                "Bad " +
-                                                "argument: mDeviceId"
+                                                "Bad " + "argument: mDeviceId"
                                                 + mDeviceId;
                                         Utils.excMsg(ECGActivity.this, msg, ex);
                                         Log.d(TAG,
                                                 this.getClass().getSimpleName()
-                                                        + " showDeviceIdDialog: " + msg);
+                                                        + " showDeviceIdDialog: "
+                                                        + msg);
                                     }
                                     mApi = null;
                                 }
@@ -703,20 +704,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
      * playing and turn it on with stopped. Zooming is not enabled.
      */
     private void setPanBehavior() {
-        // ECG
-        if (mPlaying) {
-            // Don't allow
-            PanZoom.attach(mECGPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
-            PanZoom.attach(mHRPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
-            PanZoom.attach(mQRSPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
-        } else {
-            // Allow
-            PanZoom.attach(mECGPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
-//            PanZoom.attach(mHRPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom
-//            .NONE);
-            PanZoom.attach(mHRPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
-            PanZoom.attach(mQRSPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
-        }
+        mECGPlotter.setPanning(!mPlaying);
+        mQRSPlotter.setPanning(!mPlaying);
+//        mHRPlotter.setPanning(!mPlaying);
     }
 
     /**
@@ -965,7 +955,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         msg.append("Address: ").append(mAddress).append("\n");
         msg.append("Firmware: ").append(mFirmware).append("\n");
         msg.append("Battery Level: ").append(mBatteryLevel).append("\n");
-        msg.append("Connected: ").append((mApi != null)).append("\n");
+        msg.append("API Connected: ").append(mApi != null).append("\n");
+        msg.append("Device Connected: ").append(mConnected).append("\n");
         msg.append("Playing: ").append(mPlaying).append("\n");
         msg.append("Receiving ECG: ").append(mEcgDisposable != null).append(
                 "\n");
@@ -1010,7 +1001,13 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
      */
     public void streamECG() {
         Log.d(TAG, this.getClass().getSimpleName() + " streamECG:"
-                + "mEcgDisposable=" + mEcgDisposable);
+                + " mEcgDisposable=" + mEcgDisposable
+                + " mConnected=" + mConnected
+        );
+        if (!mConnected) {
+            Utils.errMsg(this, "streamECG: Device is not connected yet");
+            return;
+        }
         logEpochInfo("UTC");
         if (mEcgDisposable == null) {
             // Set the local time to get correct timestamps. H10 apparently
@@ -1090,11 +1087,11 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         }
     }
 
-    public double msToYears(long longVal) {
+    public static double msToYears(long longVal) {
         return longVal / (1000. * 60. * 60. * 24. * 365.);
     }
 
-    public String timestampInfo(long ts, String name) {
+    public static String timestampInfo(long ts, String name) {
         SimpleDateFormat sdf =
                 new SimpleDateFormat("MMM dd yyyy HH:mm:ss zzz", Locale.US);
         sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -1106,7 +1103,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 sdf.format(date), sdf1.format(date));
     }
 
-    public void logTimestampInfo(PolarEcgData polarEcgData) {
+    @SuppressWarnings("unused")
+    public static void logTimestampInfo(PolarEcgData polarEcgData) {
         // epoch to Polar
         long offset0 = 946684800000L;
         // Polar to default
@@ -1123,6 +1121,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         Log.d(TAG, timestampInfo(now, "now"));
     }
 
+    @SuppressWarnings("unused")
     public void logSensorSettings(PolarSensorSetting sensorSetting) {
         Log.d(TAG, mName + " PolarEcgData SensorSetting: "
                 + " sampleRate=" + sensorSetting.maxSettings().settings
@@ -1133,7 +1132,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 .get(PolarSensorSetting.SettingType.RANGE));
     }
 
-    public void logEcgDataInfo(PolarEcgData polarEcgData) {
+    @SuppressWarnings("unused")
+    public static void logEcgDataInfo(PolarEcgData polarEcgData) {
         SimpleDateFormat sdf1 =
                 new SimpleDateFormat("MMM dd yyyy HH:mm:ss zzz", Locale.US);
         // epoch to Polar
@@ -1219,6 +1219,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 Log.d(TAG, "*Device connected " + s.deviceId);
                 mAddress = s.address;
                 mName = s.name;
+                mConnected = true;
                 // Set the MRU preference here after we know the name
                 setDeviceMruPref(new DeviceInfo(mName, mDeviceId));
                 Toast.makeText(ECGActivity.this,
@@ -1229,6 +1230,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             @Override
             public void deviceDisconnected(@NonNull PolarDeviceInfo s) {
                 Log.d(TAG, "*Device disconnected " + s);
+                mConnected = false;
             }
 
             @Override

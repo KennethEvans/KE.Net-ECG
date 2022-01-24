@@ -23,6 +23,7 @@ package net.kenevans.polar.polarecg;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
 
@@ -102,7 +103,7 @@ public class Utils implements IConstants {
     @SuppressWarnings("unused")
     static void excMsg(Context context, String msg, Throwable t) {
         String fullMsg = msg += "\n"
-                + context.getText(R.string.exception).toString() + ": " + t
+                + context.getText(R.string.exception) + ": " + t
                 + "\n" + t.getMessage();
         Log.e(TAG, getContextTag(context) + msg);
         alert(context, context.getText(R.string.exception).toString(), fullMsg);
@@ -164,6 +165,20 @@ public class Utils implements IConstants {
     @SuppressWarnings("unused")
     public static String getHashCode(Object obj) {
         return String.format("%08X", obj.hashCode());
+    }
+
+    /**
+     * Get the orientation of the device.
+     * @param ctx The Context.
+     * @return Either "Portrait" or "Landscape".
+     */
+    public static String getOrientation(Context ctx) {
+        int orientation = ctx.getResources().getConfiguration().orientation;
+        if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+            return "Portrait";
+        } else {
+            return "Landscape";
+        }
     }
 
 }

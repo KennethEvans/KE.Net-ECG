@@ -1,10 +1,14 @@
 package net.kenevans.polar.polarecg;
 
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.util.Log;
 
+import com.androidplot.Plot;
+import com.androidplot.PlotListener;
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
+import com.androidplot.xy.PanZoom;
 import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.StepMode;
 import com.androidplot.xy.XYGraphWidget;
@@ -21,11 +25,12 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import androidx.annotation.NonNull;
 
 public class HRPlotter implements IConstants, IQRSConstants {
-    private ECGActivity activity;
+    private ECGActivity mActivity;
     private XYPlot mPlot;
 
     private final boolean mPlotHr1 = true;
@@ -53,8 +58,8 @@ public class HRPlotter implements IConstants, IQRSConstants {
 
     private XYSeriesFormatter<XYRegionFormatter> mHrFormatter1;
     private XYSeriesFormatter<XYRegionFormatter> mRrFormatter1;
-    private SimpleXYSeries hrSeries1;
-    private SimpleXYSeries rrSeries1;
+    private SimpleXYSeries mHrSeries1;
+    private SimpleXYSeries mRrSeries1;
 
     private XYSeriesFormatter<XYRegionFormatter> mHrFormatter2;
     private XYSeriesFormatter<XYRegionFormatter> mRrFormatter2;
@@ -64,8 +69,23 @@ public class HRPlotter implements IConstants, IQRSConstants {
     public List<HrRrData> mHrRrList1 = new ArrayList<>();
     public List<HrRrData> mHrRrList2 = new ArrayList<>();
 
+    private final ReentrantReadWriteLock mLock =
+            new ReentrantReadWriteLock(true);
+    private final PlotListener mPlotListener = new PlotListener() {
+        @Override
+        public void onBeforeDraw(Plot source, Canvas canvas) {
+            mLock.writeLock().lock();
+        }
+
+        @Override
+        public void onAfterDraw(Plot source, Canvas canvas) {
+            mLock.writeLock().unlock();
+        }
+    };
+
     /**
      * CTOR that just sets the plot.
+     *
      * @param plot The XYPlot.
      */
     public HRPlotter(XYPlot plot) {
@@ -73,25 +93,23 @@ public class HRPlotter implements IConstants, IQRSConstants {
         // Don't do anything else
     }
 
-    public HRPlotter(ECGActivity activity, XYPlot plot, boolean showVertices) {
+    public HRPlotter(ECGActivity activity, XYPlot plot) {
         Log.d(TAG, this.getClass().getSimpleName() + " ECGPlotter CTOR");
-        // This is the activity, needed for resources
-        this.activity = activity;
+        // This is the mActivity, needed for resources
+        this.mActivity = activity;
         this.mPlot = plot;
 
         if (mPlotHr1) {
             mHrFormatter1 = new LineAndPointFormatter(Color.RED,
                     null, null, null);
             mHrFormatter1.setLegendIconEnabled(false);
-            hrSeries1 = new SimpleXYSeries("HR1");
-            mPlot.addSeries(hrSeries1, mHrFormatter1);
+            mHrSeries1 = new SimpleXYSeries("HR1");
         }
         if (mPlotRr1) {
             mRrFormatter1 = new LineAndPointFormatter(Color.rgb(0, 0x99, 0xFF),
                     null, null, null);
             mRrFormatter1.setLegendIconEnabled(false);
-            rrSeries1 = new SimpleXYSeries("RR1");
-            mPlot.addSeries(rrSeries1, mRrFormatter1);
+            mRrSeries1 = new SimpleXYSeries("RR1");
         }
         if (mPlotHr2) {
             mHrFormatter2 = new LineAndPointFormatter(Color.rgb(0xFF, 0x88,
@@ -99,16 +117,25 @@ public class HRPlotter implements IConstants, IQRSConstants {
                     null, null, null);
             mHrFormatter2.setLegendIconEnabled(false);
             mHrSeries2 = new SimpleXYSeries("HR2");
-            mPlot.addSeries(mHrSeries2, mHrFormatter2);
         }
         if (mPlotRr2) {
             mRrFormatter2 = new LineAndPointFormatter(Color.rgb(0, 0xBF, 0xFF),
                     null, null, null);
             mRrFormatter2.setLegendIconEnabled(false);
             mRrSeries2 = new SimpleXYSeries("RR2");
-            mPlot.addSeries(mRrSeries2, mRrFormatter2);
         }
-        setupPlot();
+
+        mLock.writeLock().lock();
+        try {
+            mPlot.addListener(mPlotListener);
+            mPlot.addSeries(mHrSeries1, mHrFormatter1);
+            mPlot.addSeries(mRrSeries1, mRrFormatter1);
+            mPlot.addSeries(mHrSeries2, mHrFormatter2);
+            mPlot.addSeries(mRrSeries2, mRrFormatter2);
+            setupPlot();
+        } finally {
+            mLock.writeLock().unlock();
+        }
     }
 
     /**
@@ -121,7 +148,7 @@ public class HRPlotter implements IConstants, IQRSConstants {
     public HRPlotter getNewInstance(XYPlot plot) {
         HRPlotter newPlotter = new HRPlotter(plot);
         newPlotter.mPlot = plot;
-        newPlotter.activity = this.activity;
+        newPlotter.mActivity = this.mActivity;
         newPlotter.mLastTime = this.mLastTime;
         newPlotter.mStartTime = this.mStartTime;
         newPlotter.mStartRrTime = this.mStartRrTime;
@@ -129,25 +156,33 @@ public class HRPlotter implements IConstants, IQRSConstants {
         newPlotter.mRunningMax2 = this.mRunningMax2;
         newPlotter.mLastRrTime = this.mLastRrTime;
         newPlotter.mLastUpdateTime = this.mLastUpdateTime;
-        newPlotter.mTotalRrTime=this.mTotalRrTime;
+        newPlotter.mTotalRrTime = this.mTotalRrTime;
 
         newPlotter.mHrFormatter1 = this.mHrFormatter1;
-        newPlotter.hrSeries1 = this.hrSeries1;
-        newPlotter.mPlot.addSeries(hrSeries1, mHrFormatter1);
+        newPlotter.mHrSeries1 = this.mHrSeries1;
 
         newPlotter.mRrFormatter1 = this.mRrFormatter1;
-        newPlotter.rrSeries1 = this.rrSeries1;
-        newPlotter.mPlot.addSeries(rrSeries1, mRrFormatter1);
+        newPlotter.mRrSeries1 = this.mRrSeries1;
 
         newPlotter.mHrFormatter2 = this.mHrFormatter2;
         newPlotter.mHrSeries2 = this.mHrSeries2;
-        newPlotter.mPlot.addSeries(mHrSeries2, mHrFormatter2);
 
         newPlotter.mRrFormatter2 = this.mRrFormatter2;
         newPlotter.mRrSeries2 = this.mRrSeries2;
-        newPlotter.mPlot.addSeries(mRrSeries2, mRrFormatter2);
 
-        newPlotter.setupPlot();
+        newPlotter.mLock.writeLock().lock();
+        try {
+            mPlot.removeListener(mPlotListener);
+            newPlotter.mPlot.addListener(newPlotter.mPlotListener);
+            newPlotter.mPlot.addSeries(mHrSeries1, mHrFormatter1);
+            newPlotter.mPlot.addSeries(mRrSeries1, mRrFormatter1);
+            newPlotter.mPlot.addSeries(mHrSeries2, mHrFormatter2);
+            newPlotter.mPlot.addSeries(mRrSeries2, mRrFormatter2);
+            newPlotter.setupPlot();
+        } finally {
+            newPlotter.mLock.writeLock().unlock();
+        }
+
         return newPlotter;
     }
 
@@ -157,50 +192,67 @@ public class HRPlotter implements IConstants, IQRSConstants {
     public void setupPlot() {
         Log.d(TAG, this.getClass().getSimpleName() + " setupPlot");
 
-        // Set the domain and range boundaries
-        updateDomainRangeBoundaries();
+        mLock.writeLock().lock();
+        try {
+            // Set the domain and range boundaries
+            updateDomainRangeBoundaries();
 
-        // Range labels will increment by 10
-        mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, 40);
+            // Range labels will increment by 10
+            mPlot.setRangeStep(StepMode.INCREMENT_BY_VAL, 40);
 //        mPlot.setDomainStep(StepMode.INCREMENT_BY_VAL, 60000); // 1 min
-        mPlot.setDomainStep(StepMode.SUBDIVIDE, 5);
-        mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.BOTTOM,
-                XYGraphWidget.Edge.LEFT);
-        // Make left labels be an integer (no decimal places)
-        mPlot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.LEFT).
-                setFormat(new DecimalFormat("#"));
-        // Set x axis labeling to be time
-        mPlot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.BOTTOM).setFormat(new Format() {
-            private final SimpleDateFormat dateFormat = X_AXIS_DATE_FORMAT;
+            mPlot.setDomainStep(StepMode.SUBDIVIDE, 5);
+            mPlot.getGraph().setLineLabelEdges(XYGraphWidget.Edge.BOTTOM,
+                    XYGraphWidget.Edge.LEFT);
+            // Make left labels be an integer (no decimal places)
+            mPlot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.LEFT).
+                    setFormat(new DecimalFormat("#"));
+            // Set x axis labeling to be time
+            mPlot.getGraph().getLineLabelStyle(XYGraphWidget.Edge.BOTTOM)
+                    .setFormat(new Format() {
+                        private final SimpleDateFormat dateFormat =
+                                X_AXIS_DATE_FORMAT;
 
-            @Override
-            public StringBuffer format(Object obj,
-                                       @NonNull StringBuffer toAppendTo,
-                                       @NonNull FieldPosition pos) {
-                long time = Math.round(((Number) obj).doubleValue());
-                return dateFormat.format(time, toAppendTo, pos);
-            }
+                        @Override
+                        public StringBuffer format(Object obj,
+                                                   @NonNull StringBuffer toAppendTo,
+                                                   @NonNull FieldPosition pos) {
+                            long time =
+                                    Math.round(((Number) obj).doubleValue());
+                            return dateFormat.format(time, toAppendTo, pos);
+                        }
 
-            @Override
-            public Object parseObject(String source,
-                                      @NonNull ParsePosition pos) {
-                return null;
-            }
-        });
+                        @Override
+                        public Object parseObject(String source,
+                                                  @NonNull ParsePosition pos) {
+                            return null;
+                        }
+                    });
 
 //        // Allow panning
 //        PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL, PanZoom.Zoom.NONE);
 
-        update();
+            update();
+        } catch (Exception ex) {
+            String msg = "Error in HRPLotter.setupPLot:\n"
+                    + "isLaidOut=" + mPlot.isLaidOut()
+                    + " width=" + mPlot.getWidth()
+                    + " height=" + mPlot.getHeight();
+            Utils.excMsg(mActivity, msg, ex);
+            Log.e(TAG, msg, ex);
+        } finally {
+            mLock.writeLock().unlock();
+        }
     }
 
     @SuppressWarnings("ConstantConditions")
     public void addValues1(double time, double hr, List<Integer> rrsMs) {
 //        Log.d(TAG, this.getClass().getSimpleName() + ": addHrValues: time="
 //                + mDateFormatSec.format(time) + " hr=" + hr + " hrSize=" +
-//                hrSeries1.size());
-        if (mPlotHr1 || mPlotRr1) {
-            mHrRrList1.add(new HrRrData(time, hr, rrsMs));
+//                mHrSeries1.size());
+        mLock.writeLock().lock();
+        try {
+            if (mPlotHr1 || mPlotRr1) {
+                mHrRrList1.add(new HrRrData(time, hr, rrsMs));
 //            StringBuilder sb = new StringBuilder();
 //            sb.append("HRPlotter: addValues1");
 //            sb.append(" time=");
@@ -210,72 +262,76 @@ public class HRPlotter implements IConstants, IQRSConstants {
 //                sb.append(rr).append(" ");
 //            }
 //            Log.d(TAG, sb.toString());
-            if (Double.isNaN(mStartTime)) mStartTime = time;
-            if (Double.isNaN(mLastTime)) {
-                mLastTime = time;
-            } else if (time > mLastTime) {
-                mLastTime = time;
+                if (Double.isNaN(mStartTime)) mStartTime = time;
+                if (Double.isNaN(mLastTime)) {
+                    mLastTime = time;
+                } else if (time > mLastTime) {
+                    mLastTime = time;
+                }
             }
-        }
 
-        // HR
-        if (mPlotHr1) {
-            mRunningMax1.add(hr);
-            hrSeries1.addLast(time, hr);
-        }
+            // HR
+            if (mPlotHr1) {
+                mRunningMax1.add(hr);
+                mHrSeries1.addLast(time, hr);
+            }
 
-        // RR
-        int nRrVals = rrsMs.size();
-        if (mPlotRr1 && nRrVals > 0) {
-            double[] tVals = new double[nRrVals];
-            Integer[] rrVals = new Integer[nRrVals];
-            rrVals = rrsMs.toArray(rrVals);
-            // Find the sum of the RR intervals
-            double totalRR = 0;
-            for (int i = 0; i < nRrVals; i++) {
-                totalRR += rrVals[i];
-            }
-            // First time
-            if (Double.isInfinite(mStartRrTime)) {
-                mStartRrTime = mLastRrTime = mLastUpdateTime = time - totalRR;
-                mTotalRrTime = 0;
-            }
-            mTotalRrTime += totalRR;
+            // RR
+            int nRrVals = rrsMs.size();
+            if (mPlotRr1 && nRrVals > 0) {
+                double[] tVals = new double[nRrVals];
+                Integer[] rrVals = new Integer[nRrVals];
+                rrVals = rrsMs.toArray(rrVals);
+                // Find the sum of the RR intervals
+                double totalRR = 0;
+                for (int i = 0; i < nRrVals; i++) {
+                    totalRR += rrVals[i];
+                }
+                // First time
+                if (Double.isInfinite(mStartRrTime)) {
+                    mStartRrTime = mLastRrTime = mLastUpdateTime =
+                            time - totalRR;
+                    mTotalRrTime = 0;
+                }
+                mTotalRrTime += totalRR;
 //        Log.d(TAG, "lastRrTime=" + mLastRrTime
 //                + " totalRR=" + totalRR
 //                + " elapsed=" + (mLastRrTime - mStartRrTime)
 //                + " totalRrTime=" + mTotalRrTime);
 
-            double rr;
-            double t = mLastRrTime;
-            for (int i = 0; i < nRrVals; i++) {
-                rr = rrVals[i];
-                t += rr;
-                tVals[i] = t;
-            }
-            // Keep them in this interval
-            if (tVals[0] < mLastUpdateTime) {
-                double deltaT = mLastUpdateTime = tVals[0];
-                t += deltaT;
+                double rr;
+                double t = mLastRrTime;
                 for (int i = 0; i < nRrVals; i++) {
-                    tVals[i] += deltaT;
+                    rr = rrVals[i];
+                    t += rr;
+                    tVals[i] = t;
                 }
-            }
-            // Keep them from being in the future
-            if (t > time) {
-                double deltaT = t - time;
+                // Keep them in this interval
+                if (tVals[0] < mLastUpdateTime) {
+                    double deltaT = mLastUpdateTime = tVals[0];
+                    t += deltaT;
+                    for (int i = 0; i < nRrVals; i++) {
+                        tVals[i] += deltaT;
+                    }
+                }
+                // Keep them from being in the future
+                if (t > time) {
+                    double deltaT = t - time;
+                    for (int i = 0; i < nRrVals; i++) {
+                        tVals[i] -= deltaT;
+                    }
+                }
+                // Add to the series
                 for (int i = 0; i < nRrVals; i++) {
-                    tVals[i] -= deltaT;
+                    rr = RR_SCALE * rrVals[i];
+                    mRunningMax1.add(rr);
+                    mRrSeries1.addLast(tVals[i], rr);
+                    mLastRrTime = tVals[i];
                 }
+                mLastUpdateTime = time;
             }
-            // Add to the series
-            for (int i = 0; i < nRrVals; i++) {
-                rr = RR_SCALE * rrVals[i];
-                mRunningMax1.add(rr);
-                rrSeries1.addLast(tVals[i], rr);
-                mLastRrTime = tVals[i];
-            }
-            mLastUpdateTime = time;
+        } finally {
+            mLock.writeLock().unlock();
         }
     }
 
@@ -284,81 +340,96 @@ public class HRPlotter implements IConstants, IQRSConstants {
 //        Log.d(TAG, this.getClass().getSimpleName() + ": addValues2: time="
 //                + mDateFormatSec.format(time) + " hr=" + hr + " rr="
 //                + RR_SCALE * rr);
-        if (mPlotHr2 || mPlotRr2) {
-            mHrRrList2.add(new HrRrData(time, hr, rr));
+        mLock.writeLock().lock();
+        try {
+            if (mPlotHr2 || mPlotRr2) {
+                mHrRrList2.add(new HrRrData(time, hr, rr));
 //            Log.d(TAG, "HRPlotter: addValues2"
 //                    + " time=" + X_AXIS_DATE_FORMAT.format(new Date(Math
 //                    .round(time)))
 //                    + " hr=" + Math.round(hr)
 //                    + " rr=" + Math.round(rr));
-            if (Double.isNaN(mStartTime)) mStartTime = time;
-            if (Double.isNaN(mLastTime)) {
-                mLastTime = time;
-            } else if (time > mLastTime) {
-                mLastTime = time;
+                if (Double.isNaN(mStartTime)) mStartTime = time;
+                if (Double.isNaN(mLastTime)) {
+                    mLastTime = time;
+                } else if (time > mLastTime) {
+                    mLastTime = time;
+                }
             }
-        }
 
-        if (mPlotHr2) {
-            mRunningMax2.add(hr);
-            mHrSeries2.addLast(time, hr);
-        }
-        if (mPlotRr2) {
-            mRunningMax2.add(RR_SCALE * rr);
-            mRrSeries2.addLast(time, RR_SCALE * rr);
+            if (mPlotHr2) {
+                mRunningMax2.add(hr);
+                mHrSeries2.addLast(time, hr);
+            }
+            if (mPlotRr2) {
+                mRunningMax2.add(RR_SCALE * rr);
+                mRrSeries2.addLast(time, RR_SCALE * rr);
+            }
+        } finally {
+            mLock.writeLock().unlock();
         }
     }
 
     /**
      * Gets info about the view.
      */
+    @SuppressWarnings("unused")
     private String getPlotInfo() {
         final String LF = "\n";
         StringBuilder sb = new StringBuilder();
-        if (mPlot == null) {
-            sb.append("Plot is null");
-            return sb.toString();
-        }
-        sb.append("Title=").append(mPlot.getTitle().getText()).append(LF);
-        sb.append("Range Title=").append(mPlot.getRangeTitle().getText()).append(LF);
-        sb.append("Domain Title=").append(mPlot.getDomainTitle().getText()).append(LF);
-        sb.append("Range Origin=").append(mPlot.getRangeOrigin()).append(LF);
-        long timeVal = mPlot.getDomainOrigin().longValue();
-        Date date = new Date(timeVal);
-        sb.append("Domain Origin=").append(date.toString()).append(LF);
-        sb.append("Range Step Value=").append(mPlot.getRangeStepValue()).append(LF);
-        sb.append("Domain Step Value=").append(mPlot.getDomainStepValue()).append(LF);
-        sb.append("Graph Width=").append(mPlot.getGraph().getSize().getWidth().getValue()).append(LF);
-        sb.append("Graph Height=").append(mPlot.getGraph().getSize().getHeight().getValue()).append(LF);
-        sb.append("TotalRrTime=").append(mTotalRrTime).append(LF);
-        if (hrSeries1 != null) {
-            if (hrSeries1.getxVals() != null) {
-                sb.append("hrSeries1 Size=").append(hrSeries1.getxVals().size()).append(LF);
+        mLock.readLock().lock();
+        try {
+            if (mPlot == null) {
+                sb.append("Plot is null");
+                return sb.toString();
             }
-        } else {
-            sb.append("hrSeries1=Null").append(LF);
-        }
-        if (rrSeries1 != null) {
-            if (rrSeries1.getxVals() != null) {
-                sb.append("rrSeries1 Size=").append(rrSeries1.getxVals().size()).append(LF);
+            sb.append("Title=").append(mPlot.getTitle().getText()).append(LF);
+            sb.append("Range Title=").append(mPlot.getRangeTitle().getText()).append(LF);
+            sb.append("Domain Title=").append(mPlot.getDomainTitle().getText()).append(LF);
+            sb.append("Range Origin=").append(mPlot.getRangeOrigin()).append(LF);
+            long timeVal = mPlot.getDomainOrigin().longValue();
+            Date date = new Date(timeVal);
+            sb.append("Domain Origin=").append(date.toString()).append(LF);
+            sb.append("Range Step Value=").append(mPlot.getRangeStepValue()).append(LF);
+            sb.append("Domain Step Value=").append(mPlot.getDomainStepValue()).append(LF);
+            sb.append("Graph Width=").append(mPlot.getGraph().getSize().getWidth().getValue()).append(LF);
+            sb.append("Graph Height=").append(mPlot.getGraph().getSize().getHeight().getValue()).append(LF);
+            sb.append("TotalRrTime=").append(mTotalRrTime).append(LF);
+            if (mHrSeries1 != null) {
+                if (mHrSeries1.getxVals() != null) {
+                    sb.append("mHrSeries1 Size=")
+                            .append(mHrSeries1.getxVals().size()).append(LF);
+                }
+            } else {
+                sb.append("mHrSeries1=Null").append(LF);
             }
-        } else {
-            sb.append("rrSeries1=Null").append(LF);
-        }
+            if (mRrSeries1 != null) {
+                if (mRrSeries1.getxVals() != null) {
+                    sb.append("mRrSeries1 Size=")
+                            .append(mRrSeries1.getxVals().size()).append(LF);
+                }
+            } else {
+                sb.append("mRrSeries1=Null").append(LF);
+            }
 
-        if (mHrSeries2 != null) {
-            if (mHrSeries2.getxVals() != null) {
-                sb.append("mHrSeries2 Size=").append(mHrSeries2.getxVals().size()).append(LF);
+            if (mHrSeries2 != null) {
+                if (mHrSeries2.getxVals() != null) {
+                    sb.append("mHrSeries2 Size=")
+                            .append(mHrSeries2.getxVals().size()).append(LF);
+                }
+            } else {
+                sb.append("mHrSeries2=Null").append(LF);
             }
-        } else {
-            sb.append("mHrSeries2=Null").append(LF);
-        }
-        if (mRrSeries2 != null) {
-            if (mRrSeries2.getxVals() != null) {
-                sb.append("mRrSeries2 Size=").append(mRrSeries2.getxVals().size()).append(LF);
+            if (mRrSeries2 != null) {
+                if (mRrSeries2.getxVals() != null) {
+                    sb.append("mRrSeries2 Size=")
+                            .append(mRrSeries2.getxVals().size()).append(LF);
+                }
+            } else {
+                sb.append("mRrSeries2=Null").append(LF);
             }
-        } else {
-            sb.append("mRrSeries2=Null").append(LF);
+        } finally {
+            mLock.readLock().unlock();
         }
         return sb.toString();
     }
@@ -373,39 +444,95 @@ public class HRPlotter implements IConstants, IQRSConstants {
 //    }
 
     public void updateDomainRangeBoundaries() {
-        double max = Math.max(mRunningMax1.max(), mRunningMax2.max());
-        if (Double.isNaN(max) || max < 60) max = 60;
+        mLock.writeLock().lock();
+        try {
+            double max = Math.max(mRunningMax1.max(), mRunningMax2.max());
+            if (Double.isNaN(max) || max < 60) max = 60;
 //        Log.d(TAG, this.getClass().getSimpleName() + "update: mStartTime="
 //                + mStartTime + " mlastTime=" + mLastTime
 //                + " max=" + max);
-        if (!Double.isNaN(mLastTime) && !Double.isNaN(mStartTime)) {
-            if (mLastTime - mStartTime > HR_PLOT_DOMAIN_INTERVAL) {
-                mPlot.setDomainBoundaries(mLastTime - HR_PLOT_DOMAIN_INTERVAL,
-                        mLastTime, BoundaryMode.FIXED);
+            if (!Double.isNaN(mLastTime) && !Double.isNaN(mStartTime)) {
+                if (mLastTime - mStartTime > HR_PLOT_DOMAIN_INTERVAL) {
+                    mPlot.setDomainBoundaries(mLastTime - HR_PLOT_DOMAIN_INTERVAL,
+                            mLastTime, BoundaryMode.FIXED);
+                } else {
+                    mPlot.setDomainBoundaries(mStartTime,
+                            mStartTime + HR_PLOT_DOMAIN_INTERVAL,
+                            BoundaryMode.FIXED);
+                }
             } else {
-                mPlot.setDomainBoundaries(mStartTime,
-                        mStartTime + HR_PLOT_DOMAIN_INTERVAL,
-                        BoundaryMode.FIXED);
+                long time0 = new Date().getTime();
+                long time1 = time0 + HR_PLOT_DOMAIN_INTERVAL;
+                mPlot.setDomainBoundaries(time0, time1, BoundaryMode.FIXED);
             }
-        } else {
-            long time0 = new Date().getTime();
-            long time1 = time0 + HR_PLOT_DOMAIN_INTERVAL;
-            mPlot.setDomainBoundaries(time0, time1, BoundaryMode.FIXED);
-        }
-        mPlot.setRangeBoundaries(0, Math.ceil(max + 10), BoundaryMode.FIXED);
+            mPlot.setRangeBoundaries(0, Math.ceil(max + 10),
+                    BoundaryMode.FIXED);
 //        RectRegion rgn= mPlot.getOuterLimits();
 //        Log.d(TAG,"OuterLimits="  + rgn.getMinX() + "," + rgn.getMaxX());
 //        mPlot.getOuterLimits().set(mStartTime, mLastTime,
 //                0, Math.ceil(max + 10));
+        } finally {
+            mLock.writeLock().unlock();
+        }
     }
 
-    public void setOuterLimits() {
-        if (!Double.isNaN(mLastTime) && Double.isNaN(mLastTime)) {
-            mPlot.getOuterLimits().setMinX(mStartTime);
-            mPlot.getOuterLimits().setMaxX(mLastTime);
-        } else {
-            mPlot.getOuterLimits().setMinX(0);
-            mPlot.getOuterLimits().setMaxX(1);
+//    public void setOuterLimits() {
+//        mLock.writeLock().lock();
+//        try {
+//            if (!Double.isNaN(mLastTime) && Double.isNaN(mLastTime)) {
+//                mPlot.getOuterLimits().setMinX(mStartTime);
+//                mPlot.getOuterLimits().setMaxX(mLastTime);
+//            } else {
+//                mPlot.getOuterLimits().setMinX(0);
+//                mPlot.getOuterLimits().setMaxX(1);
+//            }
+//        } finally {
+//            mLock.writeLock().unlock();
+//        }
+//    }
+
+    /**
+     * Updates the plot. Runs on the UI thread.
+     */
+    public void update() {
+        mLock.writeLock().lock();
+        try {
+            mActivity.runOnUiThread(mPlot::redraw);
+        } finally {
+            mLock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Sets the domain and range boundaries and the does update.
+     */
+    public void fullUpdate() {
+        mLock.writeLock().lock();
+        try {
+            updateDomainRangeBoundaries();
+            update();
+        } finally {
+            mLock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Set panning on or off.
+     *
+     * @param on Whether to be on or off (true for on).
+     */
+    @SuppressWarnings("unused")
+    public void setPanning(boolean on) {
+        mLock.writeLock().lock();
+        try {
+            if (on) {
+                PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL,
+                        PanZoom.Zoom.NONE);
+            } else {
+                PanZoom.attach(mPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
+            }
+        } finally {
+            mLock.writeLock().unlock();
         }
     }
 
@@ -413,33 +540,23 @@ public class HRPlotter implements IConstants, IQRSConstants {
      * Clears the plot.
      */
     public void clear() {
-        hrSeries1.clear();
-        rrSeries1.clear();
-        mHrSeries2.clear();
-        mRrSeries2.clear();
-        mLastTime = Double.NaN;
-        mStartTime = Double.NaN;
-        mRunningMax1 = new RunningMax(50);
-        mRunningMax2 = new RunningMax(50);
-        long time0 = new Date().getTime();
-        long time1 = time0 + HR_PLOT_DOMAIN_INTERVAL;
-        mPlot.setDomainBoundaries(time0, time1, BoundaryMode.FIXED);
-        update();
-    }
-
-    /**
-     * Updates the plot. Runs on the UI thread.
-     */
-    public void update() {
-        activity.runOnUiThread(mPlot::redraw);
-    }
-
-    /**
-     * Sets the domain and range boundaries and the does update.
-     */
-    public void fullUpdate() {
-        updateDomainRangeBoundaries();
-        update();
+        mLock.writeLock().lock();
+        try {
+            mHrSeries1.clear();
+            mRrSeries1.clear();
+            mHrSeries2.clear();
+            mRrSeries2.clear();
+            mLastTime = Double.NaN;
+            mStartTime = Double.NaN;
+            mRunningMax1 = new RunningMax(50);
+            mRunningMax2 = new RunningMax(50);
+            long time0 = new Date().getTime();
+            long time1 = time0 + HR_PLOT_DOMAIN_INTERVAL;
+            mPlot.setDomainBoundaries(time0, time1, BoundaryMode.FIXED);
+            update();
+        } finally {
+            mLock.writeLock().unlock();
+        }
     }
 
     public static class HrRrData {
@@ -447,9 +564,9 @@ public class HRPlotter implements IConstants, IQRSConstants {
         // Cardiac Monitor.
         private static final SimpleDateFormat sdf = new SimpleDateFormat(
                 "yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
-        private String time;
-        private String hr;
-        private String rr;
+        private final String time;
+        private final String hr;
+        private final String rr;
 
         public HrRrData(double time, double hr, List<Integer> rrsMs) {
             this.time = sdf.format(new Date(Math.round(time)));
@@ -495,6 +612,7 @@ public class HRPlotter implements IConstants, IQRSConstants {
             return max;
         }
 
+        @SuppressWarnings("unused")
         public int size() {
             return values.size();
         }
