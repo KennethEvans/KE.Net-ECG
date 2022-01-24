@@ -154,6 +154,8 @@ public class HRPlotter implements IConstants, IQRSConstants {
         newPlotter.mStartRrTime = this.mStartRrTime;
         newPlotter.mRunningMax1 = this.mRunningMax1;
         newPlotter.mRunningMax2 = this.mRunningMax2;
+        newPlotter.mHrRrList1 = this.mHrRrList1;
+        newPlotter.mHrRrList2 = this.mHrRrList2;
         newPlotter.mLastRrTime = this.mLastRrTime;
         newPlotter.mLastUpdateTime = this.mLastUpdateTime;
         newPlotter.mTotalRrTime = this.mTotalRrTime;
@@ -495,6 +497,8 @@ public class HRPlotter implements IConstants, IQRSConstants {
      * Updates the plot. Runs on the UI thread.
      */
     public void update() {
+//        Log.d(TAG, "HRPLotter: update: dataList sizes=" + mHrRrList1.size()
+//                + "," + mHrRrList2.size());
         mLock.writeLock().lock();
         try {
             mActivity.runOnUiThread(mPlot::redraw);

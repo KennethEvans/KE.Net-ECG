@@ -937,8 +937,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 }
                 out.flush();
                 msg = "Wrote " + docUri.getLastPathSegment();
-                Log.d(TAG, msg);
                 Utils.infoMsg(this, msg);
+                Log.d(TAG, "    Wrote " + dataList.size() + " items");
             }
         } catch (IOException ex) {
             msg = "Error writing " + saveType + " CSV file";
