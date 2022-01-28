@@ -425,9 +425,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
 //                + "addValues: dataIndex=" + mDataIndex + " mSeriesSize="
 //                + mSeries1.size() + " mSeries2Size=" + mSeries2.size()
 //                + " val1=" + val1 + " val2=" + val2);
-
-        if (mPlot.getVisibility() == View.GONE) return;
-
         mLock.writeLock().lock();
         try {
             // Add the new values, removing old values if needed
@@ -468,8 +465,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
 //                + mSeries4.size()
 //                + " sample=" + sample + " ecg=" + ecg);
 //
-        if (mPlot.getVisibility() == View.GONE) return;
-
         mLock.writeLock().lock();
         try {
             // Remove old values if needed
@@ -549,7 +544,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
      * Clears the plot and resets dataIndex.
      */
     public void clear() {
-        if (mPlot.getVisibility() == View.GONE) return;
         mLock.writeLock().lock();
         try {
             mDataIndex = 0;

@@ -66,7 +66,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.preference.PreferenceManager;
@@ -99,7 +98,7 @@ public class ECGActivity extends AppCompatActivity
     private boolean mConnected = false;
 
     //    public boolean useQRSPlotter = true;
-    public boolean mUseQRSPlot = true;
+    public boolean mUseQRSPlot = false;
 
     /***
      * Whether to save as CSV, Plot, or both.
@@ -200,6 +199,7 @@ public class ECGActivity extends AppCompatActivity
                         } else if (result.getResultCode() == RESULT_CANCELED) {
                             code = "RESULT_CANCELED";
                         }
+                        // PREF_DEVICE_ID
                         String oldDeviceId = mDeviceId;
                         mDeviceId =
                                 mSharedPreferences.getString(PREF_DEVICE_ID,
@@ -210,6 +210,10 @@ public class ECGActivity extends AppCompatActivity
                         if (!oldDeviceId.equals(mDeviceId)) {
                             resetDeviceId(oldDeviceId);
                         }
+                        // PREF_QRS_VISIBILITY
+                        mUseQRSPlot = mSharedPreferences.getBoolean(
+                                PREF_QRS_VISIBILITY, true);
+                        resetQRSVisibility();
                     });
 
     @Override
@@ -227,8 +231,6 @@ public class ECGActivity extends AppCompatActivity
         // Make the QRS plot and it's layout Gone
         if (!mUseQRSPlot) {
             mQRSPlot.setVisibility(View.GONE);
-            ConstraintLayout constraintLayout = findViewById(R.id.analysis);
-            constraintLayout.setVisibility(View.GONE);
         }
 
         mSharedPreferences =
@@ -306,6 +308,10 @@ public class ECGActivity extends AppCompatActivity
             mQRSPlot.post(() -> mQRSPlotter =
                     new QRSPlotter(this, mQRSPlot));
         }
+
+        // Set the visibility of the QRS plot
+        mUseQRSPlot = mSharedPreferences.getBoolean(PREF_QRS_VISIBILITY, true);
+        resetQRSVisibility();
 
         // Start the connection to the device
         Log.d(TAG, "    mDeviceId=" + mDeviceId);
@@ -432,8 +438,14 @@ public class ECGActivity extends AppCompatActivity
         } else if (id == R.id.save_qrs_data) {
             doSaveSessionData(SaveType.QRS_HR);
             return true;
-        } else if (id == R.id.hr) {
+        } else if (id == R.id.info) {
             info();
+            return true;
+        } else if (id == R.id.restart_api) {
+            restartApi();
+            return true;
+        } else if (id == R.id.redo_plot_setup) {
+            redoPlotSetup();
             return true;
         } else if (id == R.id.device_id) {
             selectDeviceId();
@@ -482,6 +494,9 @@ public class ECGActivity extends AppCompatActivity
         // undefined Views.
         mECGPlot = findViewById(R.id.ecgplot);
         mQRSPlot = findViewById(R.id.qrsplot);
+        if (!mUseQRSPlot) {
+            mQRSPlot.setVisibility(View.GONE);
+        }
         mHRPlot = findViewById(R.id.hrplot);
         mTextViewHR = findViewById(R.id.hr);
         mTextViewTime = findViewById(R.id.time);
@@ -985,6 +1000,18 @@ public class ECGActivity extends AppCompatActivity
         }
     }
 
+    public void redoPlotSetup() {
+        if (mECGPlotter != null) {
+            mECGPlotter.setupPlot();
+        }
+        if (mQRSPlotter != null) {
+            mQRSPlotter.setupPlot();
+        }
+        if (mHRPlotter != null) {
+            mHRPlotter.setupPlot();
+        }
+    }
+
     public void info() {
         StringBuilder msg = new StringBuilder();
         msg.append("Name: ").append(mName).append("\n");
@@ -1217,14 +1244,26 @@ public class ECGActivity extends AppCompatActivity
     }
 
     /**
-     * Tries to disconnect the device from the current API and restarts the API
-     * for the current mDeviceId.
+     * Tries to disconnect mDeviceId from the current API and restarts the API.
+     */
+    private void restartApi() {
+        Log.d(TAG, this.getClass().getSimpleName() + " restartApi:");
+        resetDeviceId(mDeviceId);
+    }
+
+    /**
+     * Tries to disconnect the device from the current API and restarts the API,
+     * which will use the current mDeviceId.
      *
      * @param oldDeviceId The previous deviceId.
      */
     private void resetDeviceId(String oldDeviceId) {
         Log.d(TAG, this.getClass().getSimpleName() + " resetDeviceId:");
         if (mApi != null) {
+            if(mEcgDisposable != null){
+                mEcgDisposable.dispose();
+                mEcgDisposable = null;
+            }
             try {
                 mApi.disconnectFromDevice(oldDeviceId);
             } catch (PolarInvalidArgument ex) {
@@ -1234,10 +1273,25 @@ public class ECGActivity extends AppCompatActivity
                 Log.d(TAG, this.getClass().getSimpleName()
                         + " resetDeviceId: " + msg);
             }
+            mApi.shutDown();
             mApi = null;
         }
+        mQRS = null;
         restart();
+    }
 
+    /**
+     * Resets the QRS plot visibility from the current value of mUseQRSPlot.
+     */
+    private void resetQRSVisibility() {
+        Log.d(TAG, this.getClass().getSimpleName() + " resetQRSVisibility:");
+        if (mQRSPlot != null) {
+            if (mUseQRSPlot) {
+                mQRSPlot.setVisibility(View.VISIBLE);
+            } else {
+                mQRSPlot.setVisibility(View.GONE);
+            }
+        }
     }
 
     public void restart() {
@@ -1278,9 +1332,9 @@ public class ECGActivity extends AppCompatActivity
 //                    Date()));
             if (!mConnected) {
                 Utils.warnMsg(ECGActivity.this, "No connection to " + mDeviceId
-                        + " after 30 seconds");
+                        + " after 1 minute");
             }
-        }, 30000);
+        }, 60000);
         mApi.setApiLogger(msg -> Log.d("PolarAPI", msg));
         mApi.setApiCallback(new PolarBleApiCallback() {
             @Override

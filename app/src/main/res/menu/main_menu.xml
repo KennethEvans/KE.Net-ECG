@@ -38,8 +38,16 @@
         android:title="@string/choose_data_directory_item"
         app:showAsAction="never" />
     <item
-        android:id="@+id/hr"
+        android:id="@+id/info"
         android:title="@string/info_item"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/redo_plot_setup"
+        android:title="@string/redo_setup_plots_item"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/restart_api"
+        android:title="@string/restart_api_item"
         app:showAsAction="never" />
     <item android:id="@+id/menu_settings"
         android:title="@string/settings_item"
