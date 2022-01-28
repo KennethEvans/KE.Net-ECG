@@ -41,4 +41,8 @@
         android:id="@+id/hr"
         android:title="@string/info_item"
         app:showAsAction="never" />
+    <item android:id="@+id/menu_settings"
+        android:title="@string/settings_item"
+        android:orderInCategory="50"
+        app:showAsAction="never"/>
 </menu>

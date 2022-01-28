@@ -1,0 +1,24 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="@string/settings_title">
+        <EditTextPreference
+            app:defaultValue=""
+            app:key="deviceId"
+            app:title="@string/device_id_title"
+            app:dialogMessage="@string/device_id_summary"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue=""
+            app:key="patientName"
+            app:title="@string/patient_name_title"
+            app:dialogMessage="@string/patient_name_summary"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="qrsVisibility"
+            app:summaryOn="@string/qrs_visibility_summary_on"
+            app:summaryOff="@string/qrs_visibility_summary_off"
+            app:title="@string/qrs_visibility_title" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

@@ -14,12 +14,24 @@ public interface IConstants {
      */
     long INVALID_DATE = Long.MIN_VALUE;
 
+    /**
+     * Name of the package for this application.
+     */
+    String PACKAGE_NAME = "net.kenevans.polar.polarecg";
 
     String PREF_DEVICE_ID = "deviceId";
     String PREF_MRU_DEVICE_IDS = "mruDeviceIds";
     String PREF_TREE_URI = "treeUri";
+    String PREF_PATIENT_NAME = "patientName";
+    String PREF_QRS_VISIBILITY = "qrsVisibility";
 
     int REQ_ACCESS_LOCATION = 1;
+    int REQ_SETTINGS = 15;
 //    int REQ_ENABLE_BLUETOOTH = 2;
 //    int REQ_GET_TREE = 10;
+
+    /**
+     * Intent code for showing settings.
+     */
+    String SETTINGS_CODE = PACKAGE_NAME + ".SettingsCode";
 }

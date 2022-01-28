@@ -23,6 +23,7 @@ package net.kenevans.polar.polarecg;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
@@ -30,6 +31,7 @@ import android.view.ContextThemeWrapper;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
+import java.util.Map;
 
 public class Utils implements IConstants {
     /**
@@ -45,10 +47,10 @@ public class Utils implements IConstants {
             AlertDialog alertDialog =
                     new AlertDialog.Builder(new ContextThemeWrapper(context,
                             R.style.PolarTheme))
-                    .setTitle(title)
-                    .setMessage(msg)
-                    .setPositiveButton(context.getText(R.string.ok),
-                            (dialog, which) -> dialog.cancel()).create();
+                            .setTitle(title)
+                            .setMessage(msg)
+                            .setPositiveButton(context.getText(R.string.ok),
+                                    (dialog, which) -> dialog.cancel()).create();
             alertDialog.show();
         } catch (Throwable t) {
             Log.e(getContextTag(context), "Error using " + title
@@ -169,6 +171,7 @@ public class Utils implements IConstants {
 
     /**
      * Get the orientation of the device.
+     *
      * @param ctx The Context.
      * @return Either "Portrait" or "Landscape".
      */
@@ -181,4 +184,24 @@ public class Utils implements IConstants {
         }
     }
 
+    /**
+     * Utility method to get an info string listing all the keys,value pairs
+     * in the given SharedPreferences.
+     *
+     * @param prefix String with text to prepend to each line, e.g. "    ".
+     * @param prefs  The given Preferences.
+     * @return The info/
+     */
+    public static String getSharedPreferencesInfo(String prefix,
+                                                  SharedPreferences prefs) {
+        Map<String, ?> map = prefs.getAll();
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, ?> entry : map.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            sb.append(prefix).append("key=").append(key)
+                    .append(" value=").append(value).append("\n");
+        }
+        return sb.toString();
+    }
 }

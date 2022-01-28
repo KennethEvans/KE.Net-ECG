@@ -35,7 +35,9 @@ class EcgImage {
     private static final float OUTLINE_WIDTH = 5f;
     private static final float CURVE_WIDTH = 3f;
 
-    static Bitmap createImage(Context context, double samplingRate, String date,
+    static Bitmap createImage(Context context, double samplingRate,
+                              String patientName,
+                              String date,
                               String id,
                               String firmware,
                               String batteryLevel,
@@ -55,6 +57,8 @@ class EcgImage {
 
         paint.setTypeface(fontBold);
         canvas.drawText("Patient:", 100, 143, paint);
+        paint.setTypeface(font);
+        canvas.drawText(patientName, 300, 143, paint);
 
         paint.setTypeface(fontBold);
         canvas.drawText("Recorded:", 100, 188, paint);

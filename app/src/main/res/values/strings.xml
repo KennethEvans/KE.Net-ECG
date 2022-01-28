@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">KE.Net ECG</string>
+    <string name="settings_name">Settings</string>
     <string name="plot_title">25 mm/s, 10 mm/mV</string>
     <string name="plot_range_title">mV</string>
     <string name="plot_domain_title">mSec</string>
@@ -25,9 +26,11 @@
     <string name="choose_data_directory_item">Set Data Directory</string>
     <string name="info_item">Info</string>
     <string name="device_id_item">Set Device ID</string>
+    <string name="settings_item">Settings</string>
     <string name="info_string">%1$s\nBattery level: %2$s\nFirmware: %3$s\nID: %4$s\n</string>
     <string name="connected_string">Connected to %1$s</string>
 
+    <!-- Plots -->
     <string name="label_hr">Heart Rate: </string>
     <string name="label_rr">R-R: </string>
     <string name="hr_title">HR and RR vs. Time</string>
@@ -36,6 +39,16 @@
     <string name="qrs_range_title">QRS Peak Detection</string>
     <string name="hr_domain_title_time">Time</string>
     <string name="hr_domain_title_sample">Sample</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="device_id_title">Device ID</string>
+    <string name="device_id_summary">Polar device ID or MAC address</string>
+    <string name="patient_name_title">Patient Name</string>
+    <string name="patient_name_summary">Patient name for ECG image file</string>
+    <string name="qrs_visibility_title">QRS Visibility</string>
+    <string name="qrs_visibility_summary_on">QRS detection plot will be shown</string>
+    <string name="qrs_visibility_summary_off">QRS detection plot will not be shown</string>
 
     <!-- Utils -->
     <string name="ok">OK</string>

@@ -16,6 +16,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.text.InputType;
@@ -68,15 +69,18 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
+import androidx.preference.PreferenceManager;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.functions.Function;
 
-public class ECGActivity extends AppCompatActivity implements IConstants,
+public class ECGActivity extends AppCompatActivity
+        implements SharedPreferences.OnSharedPreferenceChangeListener,
+        IConstants,
         IQRSConstants {
     public static final SimpleDateFormat sdfShort =
             new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
-    SharedPreferences mSharedPreferences;
+    private SharedPreferences mSharedPreferences;
     private static final int MAX_DEVICES = 3;
     // Currently the sampling rate is fixed at 130
     private QRSDetection mQRS;
@@ -118,6 +122,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
     // stopped. */
     private Date mStopTime;
 
+    // Launcher for enabling Bluetooth
     private final ActivityResultLauncher<Intent> enableBluetoothLauncher =
             registerForActivityResult(
                     new ActivityResultContracts.StartActivityForResult(),
@@ -130,6 +135,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                         }
                     });
 
+    // Launcher for PREF_TREE_URI
     private final ActivityResultLauncher<Intent> openDocumentTreeLauncher =
             registerForActivityResult(
                     new ActivityResultContracts.StartActivityForResult(),
@@ -183,6 +189,29 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                         }
                     });
 
+    // Launcher for Settings
+    private final ActivityResultLauncher<Intent> settingsLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        String code = "Unknown";
+                        if (result.getResultCode() == RESULT_OK) {
+                            code = "RESULT_OK";
+                        } else if (result.getResultCode() == RESULT_CANCELED) {
+                            code = "RESULT_CANCELED";
+                        }
+                        String oldDeviceId = mDeviceId;
+                        mDeviceId =
+                                mSharedPreferences.getString(PREF_DEVICE_ID,
+                                        "");
+                        Log.d(TAG, "settingsLauncher: resultCode=" + code
+                                + " oldDeviceId=" + oldDeviceId
+                                + " mDeviceId=" + mDeviceId);
+                        if (!oldDeviceId.equals(mDeviceId)) {
+                            resetDeviceId(oldDeviceId);
+                        }
+                    });
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         Log.d(TAG, this.getClass().getSimpleName() + " onCreate");
@@ -202,9 +231,21 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             constraintLayout.setVisibility(View.GONE);
         }
 
-        mSharedPreferences = getPreferences(MODE_PRIVATE);
+        mSharedPreferences =
+                PreferenceManager.getDefaultSharedPreferences(this);
+        // Register preference listener
+        mSharedPreferences.registerOnSharedPreferenceChangeListener(this);
+
         mStopHR = mTextViewHR.getText().toString();
         mStopTime = new Date();
+
+//        // DEBUG
+//        SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+//        Log.d(TAG, "All settings (getPreferences(MODE_PRIVATE)):\n"
+//                + Utils.getSharedPreferencesInfo("    ", prefs));
+//        prefs = PreferenceManager.getDefaultSharedPreferences(this);
+//        Log.d(TAG, "All settings (getDefaultSharedPreferences):\n"
+//                + Utils.getSharedPreferencesInfo("    ", prefs));
 
         // Start Bluetooth
         mDeviceId = mSharedPreferences.getString(PREF_DEVICE_ID, "");
@@ -234,10 +275,10 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 
     @Override
     public void onResume() {
-        Log.v(TAG, this.getClass().getSimpleName() + " onResume:");
+        Log.d(TAG, this.getClass().getSimpleName() + " onResume:");
         super.onResume();
 
-        // Check if PREF_TREE_URI is valid and remove it id not
+        // Check if PREF_TREE_URI is valid and remove it if not
         if (UriUtils.getNPersistedPermissions(this) <= 0) {
             SharedPreferences.Editor editor =
                     getPreferences(MODE_PRIVATE)
@@ -283,7 +324,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-//        Log.v(TAG, this.getClass().getSimpleName() + " onCreateOptionsMenu");
+//        Log.d(TAG, this.getClass().getSimpleName() + " onCreateOptionsMenu");
 //        Log.d(TAG, "    mPlaying=" + mPlaying);
         mMenu = menu;
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -399,6 +440,9 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             return true;
         } else if (id == R.id.choose_data_directory) {
             chooseDataDirectory();
+            return true;
+        } else if (item.getItemId() == R.id.menu_settings) {
+            showSettings();
             return true;
         }
         return false;
@@ -525,9 +569,13 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
 
     @Override
     public void onDestroy() {
-        Log.v(TAG, this.getClass().getSimpleName() + " onDestroy");
+        Log.d(TAG, this.getClass().getSimpleName() + " onDestroy");
         super.onDestroy();
         if (mApi != null) mApi.shutDown();
+        // Remove preference listener
+        if (mSharedPreferences != null) {
+            mSharedPreferences.unregisterOnSharedPreferenceChangeListener(this);
+        }
     }
 
     @Override
@@ -543,6 +591,22 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 + " ACCESS_LOCATION_REQ="
                 + REQ_ACCESS_LOCATION
         );
+    }
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
+                                          String key) {
+        Log.d(TAG, "onSharedPreferenceChanged: key=" + key);
+    }
+
+    /**
+     * Calls the settings activity.
+     */
+    public void showSettings() {
+        Log.d(TAG, "showSettings");
+        Intent intent = new Intent(ECGActivity.this,
+                SettingsActivity.class);
+        settingsLauncher.launch(intent);
     }
 
     public void selectDeviceId() {
@@ -576,22 +640,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                                     "selectDeviceId: oldDeviceId=" + oldDeviceId
                                             + " mDeviceId=" + mDeviceId);
                             if (!oldDeviceId.equals(mDeviceId)) {
-                                if (mApi != null) {
-                                    try {
-                                        mApi.disconnectFromDevice(oldDeviceId);
-                                    } catch (PolarInvalidArgument ex) {
-                                        String msg = "disconnectFromDevice: " +
-                                                "Bad " + "argument: mDeviceId"
-                                                + mDeviceId;
-                                        Utils.excMsg(ECGActivity.this, msg, ex);
-                                        Log.d(TAG,
-                                                this.getClass().getSimpleName()
-                                                        + " showDeviceIdDialog: "
-                                                        + msg);
-                                    }
-                                    mApi = null;
-                                }
-                                restart();
+                                resetDeviceId(oldDeviceId);
                             }
                         } else {
                             showDeviceIdDialog(null);
@@ -640,20 +689,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                                     getString(R.string.noDevice),
                                     Toast.LENGTH_SHORT).show();
                         } else if (!oldDeviceId.equals(mDeviceId)) {
-                            if (mApi != null) {
-                                try {
-                                    mApi.disconnectFromDevice(oldDeviceId);
-                                } catch (PolarInvalidArgument ex) {
-                                    String msg = "disconnectFromDevice: Bad " +
-                                            "argument: mDeviceId"
-                                            + mDeviceId;
-                                    Utils.excMsg(ECGActivity.this, msg, ex);
-                                    Log.d(TAG, this.getClass().getSimpleName()
-                                            + " showDeviceIdDialog: " + msg);
-                                }
-                                mApi = null;
-                            }
-                            restart();
+                            resetDeviceId(oldDeviceId);
                         }
                     }
                 });
@@ -779,6 +815,7 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             Utils.errMsg(this, "There is no data directory set");
             return;
         }
+        String patientName = prefs.getString(PREF_PATIENT_NAME, "");
         String msg;
         String format = "yyyy-MM-dd_HH-mm";
         SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
@@ -801,8 +838,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                 final LinkedList<Number> vals =
                         mECGPlotter.getSeries().getyVals();
                 final int nSamples = vals.size();
-                Bitmap bm = EcgImage.createImage(this,
-                        FS,
+                Bitmap bm = EcgImage.createImage(this, FS,
+                        patientName,
                         mStopTime.toString(),
                         mDeviceId,
                         mFirmware,
@@ -1179,6 +1216,30 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
         openDocumentTreeLauncher.launch(intent);
     }
 
+    /**
+     * Tries to disconnect the device from the current API and restarts the API
+     * for the current mDeviceId.
+     *
+     * @param oldDeviceId The previous deviceId.
+     */
+    private void resetDeviceId(String oldDeviceId) {
+        Log.d(TAG, this.getClass().getSimpleName() + " resetDeviceId:");
+        if (mApi != null) {
+            try {
+                mApi.disconnectFromDevice(oldDeviceId);
+            } catch (PolarInvalidArgument ex) {
+                String msg = "oldDeviceId=" + oldDeviceId
+                        + "\nDisconnectFromDevice: Bad argument:";
+                Utils.excMsg(ECGActivity.this, msg, ex);
+                Log.d(TAG, this.getClass().getSimpleName()
+                        + " resetDeviceId: " + msg);
+            }
+            mApi = null;
+        }
+        restart();
+
+    }
+
     public void restart() {
         Log.d(TAG, this.getClass().getSimpleName() + " restart:"
                 + " mApi=" + mApi
@@ -1208,6 +1269,19 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
                         PolarBleApi.FEATURE_DEVICE_INFO |
                         PolarBleApi.FEATURE_POLAR_FILE_TRANSFER |
                         PolarBleApi.FEATURE_HR);
+        // DEBUG
+        // Post a Runnable to have plots to be setup again in 1 sec
+        final Handler handler = new Handler();
+        handler.postDelayed(() -> {
+//            Log.d(TAG,
+//                    "No connection handler: time=" + sdfShort.format(new
+//                    Date()));
+            if (!mConnected) {
+                Utils.warnMsg(ECGActivity.this, "No connection to " + mDeviceId
+                        + " after 30 seconds");
+            }
+        }, 30000);
+        mApi.setApiLogger(msg -> Log.d("PolarAPI", msg));
         mApi.setApiCallback(new PolarBleApiCallback() {
             @Override
             public void blePowerStateChanged(boolean b) {
@@ -1301,7 +1375,8 @@ public class ECGActivity extends AppCompatActivity implements IConstants,
             mStopHR = mTextViewHR.getText().toString();
             mStopTime = new Date();
         } catch (PolarInvalidArgument ex) {
-            String msg = "connectToDevice: Bad argument: mDeviceId" + mDeviceId;
+            String msg = "mDeviceId=" + mDeviceId
+                    + "\nConnectToDevice: Bad argument:";
             Utils.excMsg(this, msg, ex);
             Log.d(TAG, "    restart: " + msg);
             mPlaying = false;
