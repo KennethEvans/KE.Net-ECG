@@ -1,0 +1,59 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<title>BLE Cardiac Monitor</title>
+</head>
+<body>
+<h3 align="center">KE.Net ECG </h3>
+<p align="left">This application displays a real-time ECG from a Polar H10 Heart Sensor. At this time it only works with the H10, and the H10 has to have firmware version 3.0.35 or later installed. It uses the SDK for Polar Sensors (<a href="https://github.com/polarofficial/polar-ble-sdk">https://github.com/polarofficial/polar-ble-sdk</a>) to access this capability on the H10. You will need to know the device ID, which is printed on top of the sensor. The ECG is plotted on a strip chart. Only the last up to 30 seconds  is retained. The data can be exported to a PNG image file of the trace (shows all 30 seconds on graph paper with a header) and also to a CSV file. The interface also shows the running heart rate and other information from the device.</p>
+<h3 align="left">QRS Detection </h3>
+<p align="left">As of version 2.0, the application has its own built-in QRS detection algorithm, and there is a plot of the HR and RR values from both the sensor and the internal algorithm. The internal algorithm was developed because in some situations the heart rate the H10 reports is inconsistent with the number of peaks in the ECG. The algorithm is too complicated to describe here but is based on the 1985 paper by Jiapu Pan and Willis J. Tompkins (<a href="https://courses.cs.washington.edu/courses/cse474/18wi/labs/l8/QRSdetection.pdf">https://courses.cs.washington.edu/courses/cse474/18wi/labs/l8/QRSdetection.pdf</a>) but with significant modifications.</p>
+<h3>KE.Net Screenshot </h3>
+<p align="center"><img src="Screenshot-KEDotNet-ECG.jpg" alt="Screenshot" width="50%" /></p>
+<h3 align="left">HR/RR Plot </h3>
+<p align="left">This is  a plot of the HR and RR from both the sensor and the algorithm. The HR is in bpm, and the RR intervals are in units of 0.1 milliseconds (to keep values in the same range as the HR values). The lighter values are the internal calculation. The darker ones are from the sensor. These data are not limited to the last 30 seconds and can be exported to CSV files for use elsewhere. Note that HR is a derived quantity. It is an average of some kind over RR intervals, and is not measured directly. The RR intervals are what is actually measured. It is not public information what algorithms the H10 uses, but the internal algorithm uses 60 / (Running average of last 25 RR intervals in seconds) beats per minute.</p>
+<h3 align="left">QRS Plot </h3>
+<p align="left">There is also optionally a plot of the intermediate steps in the algorithm. This is mostly useful for investigating what the algorithm is doing and not for looking at actual ECG data. This plots shows where it detected a peak and the final results of the digital filtering plus its scoring algorithm. Owing to the properties of digital filters, these later are delayed from the input ECG signal. This plot can be turned off in Settings.</p>
+<h3 align="left">Some ECG Basics</h3>
+<p align="left">The data are shown on a plot that has markings like a usual ECG plot. There are small and large boxes in the grid. A large box is 0.2 sec (5 per sec) on the horizontal (time) axis and 0.5 mV on the vertical axis. There are 5 small boxes in a large box. For a HR of 60 bpm, you would expect to see one QRS peak every 5 large blocks. For a faster HR, the peaks would be at shorter intervals. A description of how the electrical system in the heart works is beyond the scope of this help page. The essential feature is the distinctive blips in an ECG, which are what is known as the QRS complex. It has to do with the electrical signals that tell the ventricles to contract. R is the peak value in this complex, and the RR intervals are the time between the R peaks. </p>
+<p align="left">The terms EKG and ECG are both used for electrocardiograms. They are the same. EKG is German, and probably more common. The usual ECG in a doctor's office is for 10 seconds and has more than one plot, corresponding to the different leads in the usual 12-lead ECG. The H10 only has one lead, the one usually denoted as I and which corresponds to the horizontal axis. </p>
+<p align="left">A Bluetooth Low Energy (BLE) sensor, such as the H10, typically delivers a small packet of information once per second (hence low energy).  It has one HR and zero or more RR values per packet. There is no timestamp. (The internal algorithm, in contrast, knows the time of each R peak.)  Most exercise apps do not show the RR values, whether they receive them or not. The RR intervals are useful in detecting arrythmias. There is also a whole science of Heart Rate Variability (HRV). The small variations in the RR intervals have information that some athletes use to increase their performance. More variation has been shown to be beneficial (where there is no arrhythmia). </p>
+<p align="left">The H10 supplies the usual BLE packets with the values just described.  In addition, unlike most other monitors, you can get the full ECG trace at 130 Hz intervals.  This is  less resolution than that for a typical medical ECG, but still very usable. This mechanism is separate from the mechanism by which it supplies the HR/RR values and is proprietary.</p>
+<h3 align="left">Some Application Basics</h3>
+<p align="left">As of Android 6.0 (API 23, Marshmallow) Android requires Location permission to scan for Bluetooth devices, and if not granted, KE.Net ECG will not work. If the permission is not granted, KE.Net ECG will prompt you to allow this permission when it starts. If you also check &quot;Don't ask again&quot;, there will be no prompt, just the notice. You can always change the permission  manually in Settings. </p>
+<p align="left">KE.Net ECG has been made to work with the Android Storage Access Framework in order to comply with Android policies about writing external storage. In order to save exported files, you need to allow KE.Net ECG access to a directory of your choice by selecting it in a system file chooser.  You do this with the Set Data Directory menu item.  It can be on the external SD card.  Starting with Android 11, it cannot be the Downloads directory. Repeating this operation with a different directory will override the previous setting but will not move the files. You can do that manually. The data in this directory will be retained on uninstall (provided it is not in app-specific storage).</p>
+<p align="left">KE.Net ECG will respond to orientation changes of your Android phone or other device without losing the ECG. It can also be run with the device turned off, provided it has a connection. In some cases there may be problems when it is turned off. It is thus safest to keep it on while using it. This should not be a problem for a 30 second ECG. It may be a problem if you are collecting longer-term HR and RR data.</p>
+<h3 align="left"><a name="menu" id="menu"></a>Menu </h3>
+<p align="left">There is an icon on the Toolbar (if there is enough room) that depends on whether it is collecting data or not. When playing, the icon will be a Stop icon, and when stopped it will be a Play icon. It starts in the Playing mode, and will start showing ECG data as soon as it is connected and receiving them. In order to save or export data files, it needs to be stopped first. The Save menu items should not appear when playing. Also panning is not enabled when playing, but is when stopped. Panning is not ever enabled on the HR/RR plot owing to issues with AndroidPlot. When you start playing again, the current data is lost, and it starts over. </p>
+<p align="left"><strong>Save Data and Plot</strong></p>
+<p align="left">Saves the ECG data and the PNG image. </p>
+<p align="left"><strong>Save All</strong></p>
+<p align="left">Saves everything that can be saved. This includes the ECG data CSV file, PNG image, and CSV files for both the sensor and internal algorithm HR and RR values.</p>
+<p align="left"><strong></strong><strong>Save Plot</strong></p>
+<p align="left">Saves only the PNG image.</p>
+<p align="left"><strong>Save Data </strong></p>
+<p align="left">Saves a CSV file with  the ECG data.</p>
+<p align="left"><strong>Save Sensor HR Data</strong></p>
+<p align="left">Saves a CSV file for the sensor  HR and RR values.     </p>
+<p align="left"><strong>Save Calculated HR Data</strong></p>
+<p align="left">Saves a CSV file for the internal algorithm HR and RR values. </p>
+<p align="left"><strong>Set Device ID </strong></p>
+<p align="left">Allows you to set the device ID for your H10. You can also do this in Settings, but this is a more complete interface, allowing you to select from values you have most recently used. (That might be useful if you have more than one H10.) The device ID has to be set the first time or the app will not be able to find your device.</p>
+<p align="left"><strong>Set Data Directory</strong></p>
+<p align="left">Brings up a system file chooser to choose the data directory. This is where all your exported data is stored.  It can be anywhere the file chooser allows, which should include the SD card.   You cannot save data until it is set. </p>
+<p align="left"><strong>Info</strong></p>
+<p align="left">Displays information about the sensor and current status.</p>
+<p align="left"><strong>Redo Plot Setup</strong></p>
+<p align="left">The initial setup determines the basic configuration of the plot and the grid. The plotting setup happens in different threads at different times and some cannot be done until the plot has been drawn at least once. This can cause race conditions. This menu item should not usually be needed, but is provided to correct any problems caused by the steps not being executed in the desired order. This is most likely to occur on an orientation change or when changing the visibility of the QRS plot.</p>
+<p align="left"><strong>Restart Polar API  </strong></p>
+<p align="left">This restarts the connection to the Polar SDK implementation. It is essentially the same as restarting the app. It should not usually be necessary, but may be useful if the H10 did not connect for some reason.</p>
+<p><a name="settings" id="settings"></a><strong>Settings</strong>
+</p>
+<p align="left">The Settings screen allows you to set the device id, the patient name (goes on the PNG image), and whether the QRS plot is visible. The device ID can more easily be set via the Set Device Id menu item. </p>
+<h3 align="left"><a name="acknowledgement" id="acknowledgement"></a>Acknowledgements</h3>
+<p>The plotting uses AndroidPlot (<a href="https://github.com/halfhp/androidplot">https://github.com/halfhp/androidplot</a>).</p>
+<p>The data are obtained using   the SDK for Polar Sensors (<a href="https://github.com/polarofficial/polar-ble-sdk">https://github.com/polarofficial/polar-ble-sdk</a>).</p>
+<p>&nbsp;</p>
+</body>
+</html>

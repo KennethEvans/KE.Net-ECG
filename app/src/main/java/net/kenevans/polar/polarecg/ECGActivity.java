@@ -1,6 +1,7 @@
 package net.kenevans.polar.polarecg;
 
 import android.Manifest;
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.content.ContentResolver;
@@ -337,6 +338,7 @@ public class ECGActivity extends AppCompatActivity
         getMenuInflater().inflate(R.menu.main_menu, menu);
         if (mApi == null) {
             mMenu.findItem(R.id.pause).setTitle("Start");
+            mMenu.findItem(R.id.save_all).setVisible(false);
             mMenu.findItem(R.id.save_data).setVisible(false);
             mMenu.findItem(R.id.save_plot).setVisible(false);
             mMenu.findItem(R.id.save_both).setVisible(false);
@@ -348,6 +350,7 @@ public class ECGActivity extends AppCompatActivity
                     getDrawable(getResources(),
                             R.drawable.ic_stop_white_36dp, null));
             mMenu.findItem(R.id.pause).setTitle("Pause");
+            mMenu.findItem(R.id.save_all).setVisible(false);
             mMenu.findItem(R.id.save_data).setVisible(false);
             mMenu.findItem(R.id.save_plot).setVisible(false);
             mMenu.findItem(R.id.save_both).setVisible(false);
@@ -358,6 +361,7 @@ public class ECGActivity extends AppCompatActivity
                     getDrawable(getResources(),
                             R.drawable.ic_play_arrow_white_36dp, null));
             mMenu.findItem(R.id.pause).setTitle("Start");
+            mMenu.findItem(R.id.save_all).setVisible(true);
             mMenu.findItem(R.id.save_data).setVisible(true);
             mMenu.findItem(R.id.save_plot).setVisible(true);
             mMenu.findItem(R.id.save_both).setVisible(true);
@@ -452,6 +456,9 @@ public class ECGActivity extends AppCompatActivity
             return true;
         } else if (id == R.id.choose_data_directory) {
             chooseDataDirectory();
+            return true;
+        } else if (id == R.id.help) {
+            showHelp();
             return true;
         } else if (item.getItemId() == R.id.menu_settings) {
             showSettings();
@@ -612,6 +619,24 @@ public class ECGActivity extends AppCompatActivity
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
                                           String key) {
         Log.d(TAG, "onSharedPreferenceChanged: key=" + key);
+    }
+
+    /**
+     * Show the help.
+     */
+    private void showHelp() {
+        Log.d(TAG, "showHelp");
+        try {
+            // Start theInfoActivity
+            Intent intent = new Intent();
+            intent.setClass(this, InfoActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            intent.putExtra(INFO_URL, "file:///android_asset/kedotnetecg.html");
+            startActivity(intent);
+        } catch (Exception ex) {
+            Utils.excMsg(this, getString(R.string.help_show_error), ex);
+        }
     }
 
     /**
@@ -1260,7 +1285,7 @@ public class ECGActivity extends AppCompatActivity
     private void resetDeviceId(String oldDeviceId) {
         Log.d(TAG, this.getClass().getSimpleName() + " resetDeviceId:");
         if (mApi != null) {
-            if(mEcgDisposable != null){
+            if (mEcgDisposable != null) {
                 mEcgDisposable.dispose();
                 mEcgDisposable = null;
             }

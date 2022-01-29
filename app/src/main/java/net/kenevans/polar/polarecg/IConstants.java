@@ -31,6 +31,11 @@ public interface IConstants {
 //    int REQ_GET_TREE = 10;
 
     /**
+     * Key for information URL sent to InfoActivity.
+     */
+    String INFO_URL = "InformationURL";
+
+    /**
      * Intent code for showing settings.
      */
     String SETTINGS_CODE = PACKAGE_NAME + ".SettingsCode";

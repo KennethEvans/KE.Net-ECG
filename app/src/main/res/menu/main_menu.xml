@@ -49,8 +49,13 @@
         android:id="@+id/restart_api"
         android:title="@string/restart_api_item"
         app:showAsAction="never" />
-    <item android:id="@+id/menu_settings"
-        android:title="@string/settings_item"
+    <item
+        android:id="@+id/help"
+        android:title="@string/help_item"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_settings"
         android:orderInCategory="50"
-        app:showAsAction="never"/>
+        android:title="@string/settings_item"
+        app:showAsAction="never" />
 </menu>

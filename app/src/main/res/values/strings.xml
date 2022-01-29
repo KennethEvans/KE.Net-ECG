@@ -9,7 +9,7 @@
     <string name="disconnect">DISCONNECT</string>
     <string name="connect">CONNECT ECG</string>
     <string name="connect2">CONNECT HR/RR</string>
-    <string name="connecting">Connecting to device</string>
+    <string name="connecting">Connecting to sensor</string>
     <string name="noDevice">There is no device defined</string>
     <string name="device_id">device_id</string>
     <string name="set_id_button">Change device ID</string>
@@ -21,7 +21,7 @@
     <string name="save_plot_item">Save Plot</string>
     <string name="save_both_item">Save Data &amp; Plot</string>
     <string name="save_all_item">Save All</string>
-    <string name="save_device_data_item">Save Device HR Data</string>
+    <string name="save_device_data_item">Save Sensor HR Data</string>
     <string name="save_qrs_data_item">Save Calculated HR Data</string>
     <string name="choose_data_directory_item">Set Data Directory</string>
     <string name="info_item">Info</string>
@@ -37,7 +37,7 @@
     <string name="label_rr">R-R: </string>
     <string name="hr_title">HR and RR vs. Time</string>
     <string name="qrs_title">ECG vs. Time</string>
-    <string name="hr_range_title">HR, /sec RR, ms/10</string>
+    <string name="hr_range_title">HR, bpm RR, ms/10</string>
     <string name="qrs_range_title">QRS Peak Detection</string>
     <string name="hr_domain_title_time">Time</string>
     <string name="hr_domain_title_sample">Sample</string>
@@ -51,6 +51,12 @@
     <string name="qrs_visibility_title">QRS Visibility</string>
     <string name="qrs_visibility_summary_on">QRS detection plot will be shown</string>
     <string name="qrs_visibility_summary_off">QRS detection plot will not be shown</string>
+
+    <!-- Info/Help -->
+    <string name="help_url_not_found">Cannot find Help URL</string>
+    <string name="help_item">Help</string>
+    <string name="help_title">Help</string>
+    <string name="help_show_error">Error showing help</string>
 
     <!-- Utils -->
     <string name="ok">OK</string>

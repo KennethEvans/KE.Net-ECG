@@ -25,6 +25,8 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity android:name=".InfoActivity" android:label="@string/help_title">
+        </activity>
         <activity
             android:theme="@style/SettingsTheme"
             android:name="net.kenevans.polar.polarecg.SettingsActivity"
