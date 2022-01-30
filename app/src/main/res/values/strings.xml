@@ -17,11 +17,12 @@
     <string name="pause_item">Pause</string>
     <string name="play_item">Play</string>
     <string name="stop_item">Stop</string>
+    <string name="save_item">Save</string>
     <string name="save_data_item">Save Data</string>
     <string name="save_plot_item">Save Plot</string>
     <string name="save_both_item">Save Data &amp; Plot</string>
     <string name="save_all_item">Save All</string>
-    <string name="save_device_data_item">Save Sensor HR Data</string>
+    <string name="save_device_data_item">Save Device HR Data</string>
     <string name="save_qrs_data_item">Save Calculated HR Data</string>
     <string name="choose_data_directory_item">Set Data Directory</string>
     <string name="info_item">Info</string>

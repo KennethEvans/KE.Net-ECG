@@ -170,6 +170,23 @@ public class Utils implements IConstants {
     }
 
     /**
+     * Get the version name for the application with the specified context.
+     *
+     * @param ctx The context.
+     * @return The package name.
+     */
+    public static String getVersion(Context ctx) {
+        String versionName = "NA";
+        try {
+            versionName = ctx.getPackageManager()
+                    .getPackageInfo(ctx.getPackageName(), 0).versionName;
+        } catch (Exception ex) {
+            // Do nothing
+        }
+        return versionName;
+    }
+
+    /**
      * Get the orientation of the device.
      *
      * @param ctx The Context.

@@ -41,7 +41,9 @@ class EcgImage {
                               String id,
                               String firmware,
                               String batteryLevel,
-                              String notes, String hr, String duration,
+                              String notes,
+                              String hr,
+                              String duration,
                               LinkedList<Number> vals) {
         Bitmap bm = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888);
         bm.eraseColor(Color.WHITE);

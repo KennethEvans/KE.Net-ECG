@@ -1,7 +1,6 @@
 package net.kenevans.polar.polarecg;
 
 import android.Manifest;
-import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.content.ContentResolver;
@@ -116,8 +115,12 @@ public class ECGActivity extends AppCompatActivity
     private String mName = "Unknown";
     private String mAddress = "Unknown";
     private String mBatteryLevel = "Unknown";
-    //* HR when stopped playing. Updated whenever playing started or stopped. */
-    private String mStopHR;
+    //* Device HR when stopped playing. Updated whenever playing started or
+    // stopped. */
+    private String mDeviceStopHR;
+    //* Calculated HR when stopped playing. Updated whenever playing started
+    // or stopped. */
+    private String mCalcStopHR;
     //* Date when stopped playing. Updated whenever playing started or
     // stopped. */
     private Date mStopTime;
@@ -239,7 +242,7 @@ public class ECGActivity extends AppCompatActivity
         // Register preference listener
         mSharedPreferences.registerOnSharedPreferenceChangeListener(this);
 
-        mStopHR = mTextViewHR.getText().toString();
+        setLastHr();
         mStopTime = new Date();
 
 //        // DEBUG
@@ -338,35 +341,19 @@ public class ECGActivity extends AppCompatActivity
         getMenuInflater().inflate(R.menu.main_menu, menu);
         if (mApi == null) {
             mMenu.findItem(R.id.pause).setTitle("Start");
-            mMenu.findItem(R.id.save_all).setVisible(false);
-            mMenu.findItem(R.id.save_data).setVisible(false);
-            mMenu.findItem(R.id.save_plot).setVisible(false);
-            mMenu.findItem(R.id.save_both).setVisible(false);
-            mMenu.findItem(R.id.save_device_data).setVisible(false);
-            mMenu.findItem(R.id.save_qrs_data).setVisible(false);
-            mMenu.findItem(R.id.device_id).setVisible(true);
+            mMenu.findItem(R.id.save).setVisible(false);
         } else if (mPlaying) {
             mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
                     getDrawable(getResources(),
                             R.drawable.ic_stop_white_36dp, null));
             mMenu.findItem(R.id.pause).setTitle("Pause");
-            mMenu.findItem(R.id.save_all).setVisible(false);
-            mMenu.findItem(R.id.save_data).setVisible(false);
-            mMenu.findItem(R.id.save_plot).setVisible(false);
-            mMenu.findItem(R.id.save_both).setVisible(false);
-            mMenu.findItem(R.id.save_device_data).setVisible(false);
-            mMenu.findItem(R.id.save_qrs_data).setVisible(false);
+            mMenu.findItem(R.id.save).setVisible(false);
         } else {
             mMenu.findItem(R.id.pause).setIcon(ResourcesCompat.
                     getDrawable(getResources(),
                             R.drawable.ic_play_arrow_white_36dp, null));
             mMenu.findItem(R.id.pause).setTitle("Start");
-            mMenu.findItem(R.id.save_all).setVisible(true);
-            mMenu.findItem(R.id.save_data).setVisible(true);
-            mMenu.findItem(R.id.save_plot).setVisible(true);
-            mMenu.findItem(R.id.save_both).setVisible(true);
-            mMenu.findItem(R.id.save_device_data).setVisible(true);
-            mMenu.findItem(R.id.save_qrs_data).setVisible(true);
+            mMenu.findItem(R.id.save).setVisible(true);
         }
         return true;
     }
@@ -380,7 +367,7 @@ public class ECGActivity extends AppCompatActivity
             }
             if (mPlaying) {
                 // Turn it off
-                mStopHR = mTextViewHR.getText().toString();
+                setLastHr();
                 mStopTime = new Date();
                 mPlaying = false;
                 setPanBehavior();
@@ -392,14 +379,10 @@ public class ECGActivity extends AppCompatActivity
                         getDrawable(getResources(),
                                 R.drawable.ic_play_arrow_white_36dp, null));
                 mMenu.findItem(R.id.pause).setTitle("Start");
-                mMenu.findItem(R.id.save_data).setVisible(true);
-                mMenu.findItem(R.id.save_plot).setVisible(true);
-                mMenu.findItem(R.id.save_both).setVisible(true);
-                mMenu.findItem(R.id.save_device_data).setVisible(true);
-                mMenu.findItem(R.id.save_qrs_data).setVisible(true);
+                mMenu.findItem(R.id.save).setVisible(true);
             } else {
                 // Turn it on
-                mStopHR = mTextViewHR.getText().toString();
+                setLastHr();
                 mStopTime = new Date();
                 mPlaying = true;
                 setPanBehavior();
@@ -417,11 +400,7 @@ public class ECGActivity extends AppCompatActivity
                         getDrawable(getResources(),
                                 R.drawable.ic_stop_white_36dp, null));
                 mMenu.findItem(R.id.pause).setTitle("Pause");
-                mMenu.findItem(R.id.save_data).setVisible(false);
-                mMenu.findItem(R.id.save_plot).setVisible(false);
-                mMenu.findItem(R.id.save_both).setVisible(false);
-                mMenu.findItem(R.id.save_device_data).setVisible(false);
-                mMenu.findItem(R.id.save_qrs_data).setVisible(false);
+                mMenu.findItem(R.id.save).setVisible(false);
             }
             return true;
         } else if (id == R.id.save_plot) {
@@ -621,10 +600,29 @@ public class ECGActivity extends AppCompatActivity
         Log.d(TAG, "onSharedPreferenceChanged: key=" + key);
     }
 
+    /***
+     * Sets the last HR from the series in the HR plotter.
+     */
+    public void setLastHr() {
+        mDeviceStopHR = mCalcStopHR = "Unknown";
+        if (mHRPlotter == null) return;
+        long lastVal;
+        if (mHRPlotter.mHrSeries1 != null && mHRPlotter.mHrSeries1.size() > 0) {
+            lastVal = Math.round(
+                    mHRPlotter.mHrSeries1.getxVals().getLast().doubleValue());
+            mDeviceStopHR = String.format(Locale.US, "%d", lastVal);
+        }
+        if (mHRPlotter.mHrSeries2 != null && mHRPlotter.mHrSeries2.size() > 0) {
+            lastVal = Math.round(
+                    mHRPlotter.mHrSeries2.getxVals().getLast().doubleValue());
+            mCalcStopHR = String.format(Locale.US, "%d", lastVal);
+        }
+    }
+
     /**
      * Show the help.
      */
-    private void showHelp() {
+    public void showHelp() {
         Log.d(TAG, "showHelp");
         try {
             // Start theInfoActivity
@@ -885,7 +883,7 @@ public class ECGActivity extends AppCompatActivity
                         mFirmware,
                         mBatteryLevel,
                         note,
-                        mStopHR,
+                        mDeviceStopHR,
                         String.format(Locale.US, "%.1f " +
                                 "sec", nSamples / FS),
                         vals);
@@ -935,16 +933,25 @@ public class ECGActivity extends AppCompatActivity
             try (FileWriter writer = new FileWriter(pfd.getFileDescriptor());
                  PrintWriter out = new PrintWriter((writer))) {
                 // Write header
-                out.write(mStopTime.toString() + "\n");
-                // The text for this TextView already has a \n
-                out.write(mTextViewInfo.getText().toString());
-                out.write(note + "\n");
-                out.write("HR " + mStopHR + "\n");
-                // Write samples
                 LinkedList<Number> vals = mECGPlotter.getSeries().getyVals();
                 int nSamples = vals.size();
-                out.write(nSamples + " values " + String.format(Locale.US,
-                        "%.1f sec\n", nSamples / FS));
+                String duration = String.format(Locale.US, "%.1f sec",
+                        nSamples / FS);
+                out.write("application=" + "KE.Net ECG Version: "
+                        + Utils.getVersion(this) + "\n");
+                out.write("stoptime=" + mStopTime.toString() + "\n");
+                out.write("duration=" + duration + "\n");
+                out.write("nsamples=" + nSamples + "\n");
+                out.write("samplingrate=" + FS + "\n");
+                out.write("stopdevicehr=" + mDeviceStopHR + "\n");
+                out.write("stopcalculatedhr=" + mCalcStopHR + "\n");
+                out.write("devicename=" + mName + "\n");
+                out.write("deviceid=" + mDeviceId + "\n");
+                out.write("battery=" + mBatteryLevel + "\n");
+                out.write("firmware=" + mFirmware + "\n");
+                out.write("note=" + note + "\n");
+
+                // Write samples
                 for (Number val : vals) {
                     out.write(String.format(Locale.US, "%.3f\n",
                             val.doubleValue()));
@@ -1451,7 +1458,7 @@ public class ECGActivity extends AppCompatActivity
         try {
             mApi.connectToDevice(mDeviceId);
             mPlaying = true;
-            mStopHR = mTextViewHR.getText().toString();
+            setLastHr();
             mStopTime = new Date();
         } catch (PolarInvalidArgument ex) {
             String msg = "mDeviceId=" + mDeviceId
@@ -1459,7 +1466,7 @@ public class ECGActivity extends AppCompatActivity
             Utils.excMsg(this, msg, ex);
             Log.d(TAG, "    restart: " + msg);
             mPlaying = false;
-            mStopHR = mTextViewHR.getText().toString();
+            setLastHr();
             mStopTime = new Date();
         }
         invalidateOptionsMenu();

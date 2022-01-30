@@ -58,13 +58,13 @@ public class HRPlotter implements IConstants, IQRSConstants {
 
     private XYSeriesFormatter<XYRegionFormatter> mHrFormatter1;
     private XYSeriesFormatter<XYRegionFormatter> mRrFormatter1;
-    private SimpleXYSeries mHrSeries1;
-    private SimpleXYSeries mRrSeries1;
+    public SimpleXYSeries mHrSeries1;
+    public SimpleXYSeries mRrSeries1;
 
     private XYSeriesFormatter<XYRegionFormatter> mHrFormatter2;
     private XYSeriesFormatter<XYRegionFormatter> mRrFormatter2;
-    private SimpleXYSeries mHrSeries2;
-    private SimpleXYSeries mRrSeries2;
+    public SimpleXYSeries mHrSeries2;
+    public SimpleXYSeries mRrSeries2;
 
     public List<HrRrData> mHrRrList1 = new ArrayList<>();
     public List<HrRrData> mHrRrList2 = new ArrayList<>();
@@ -391,7 +391,7 @@ public class HRPlotter implements IConstants, IQRSConstants {
             sb.append("Range Origin=").append(mPlot.getRangeOrigin()).append(LF);
             long timeVal = mPlot.getDomainOrigin().longValue();
             Date date = new Date(timeVal);
-            sb.append("Domain Origin=").append(date.toString()).append(LF);
+            sb.append("Domain Origin=").append(date).append(LF);
             sb.append("Range Step Value=").append(mPlot.getRangeStepValue()).append(LF);
             sb.append("Domain Step Value=").append(mPlot.getDomainStepValue()).append(LF);
             sb.append("Graph Width=").append(mPlot.getGraph().getSize().getWidth().getValue()).append(LF);

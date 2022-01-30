@@ -9,7 +9,7 @@
 <p align="left">This application displays a real-time ECG from a Polar H10 Heart Sensor. At this time it only works with the H10, and the H10 has to have firmware version 3.0.35 or later installed. It uses the SDK for Polar Sensors (<a href="https://github.com/polarofficial/polar-ble-sdk">https://github.com/polarofficial/polar-ble-sdk</a>) to access this capability on the H10. You will need to know the device ID, which is printed on top of the sensor. The ECG is plotted on a strip chart. Only the last up to 30 seconds  is retained. The data can be exported to a PNG image file of the trace (shows all 30 seconds on graph paper with a header) and also to a CSV file. The interface also shows the running heart rate and other information from the device.</p>
 <h3 align="left">QRS Detection </h3>
 <p align="left">As of version 2.0, the application has its own built-in QRS detection algorithm, and there is a plot of the HR and RR values from both the sensor and the internal algorithm. The internal algorithm was developed because in some situations the heart rate the H10 reports is inconsistent with the number of peaks in the ECG. The algorithm is too complicated to describe here but is based on the 1985 paper by Jiapu Pan and Willis J. Tompkins (<a href="https://courses.cs.washington.edu/courses/cse474/18wi/labs/l8/QRSdetection.pdf">https://courses.cs.washington.edu/courses/cse474/18wi/labs/l8/QRSdetection.pdf</a>) but with significant modifications.</p>
-<h3>KE.Net Screenshot </h3>
+<h3>KE.Net Screen Shot </h3>
 <p align="center"><img src="Screenshot-KEDotNet-ECG.jpg" alt="Screenshot" width="50%" /></p>
 <h3 align="left">HR/RR Plot </h3>
 <p align="left">This is  a plot of the HR and RR from both the sensor and the algorithm. The HR is in bpm, and the RR intervals are in units of 0.1 milliseconds (to keep values in the same range as the HR values). The lighter values are the internal calculation. The darker ones are from the sensor. These data are not limited to the last 30 seconds and can be exported to CSV files for use elsewhere. Note that HR is a derived quantity. It is an average of some kind over RR intervals, and is not measured directly. The RR intervals are what is actually measured. It is not public information what algorithms the H10 uses, but the internal algorithm uses 60 / (Running average of last 25 RR intervals in seconds) beats per minute.</p>
@@ -24,20 +24,92 @@
 <p align="left">As of Android 6.0 (API 23, Marshmallow) Android requires Location permission to scan for Bluetooth devices, and if not granted, KE.Net ECG will not work. If the permission is not granted, KE.Net ECG will prompt you to allow this permission when it starts. If you also check &quot;Don't ask again&quot;, there will be no prompt, just the notice. You can always change the permission  manually in Settings. </p>
 <p align="left">KE.Net ECG has been made to work with the Android Storage Access Framework in order to comply with Android policies about writing external storage. In order to save exported files, you need to allow KE.Net ECG access to a directory of your choice by selecting it in a system file chooser.  You do this with the Set Data Directory menu item.  It can be on the external SD card.  Starting with Android 11, it cannot be the Downloads directory. Repeating this operation with a different directory will override the previous setting but will not move the files. You can do that manually. The data in this directory will be retained on uninstall (provided it is not in app-specific storage).</p>
 <p align="left">KE.Net ECG will respond to orientation changes of your Android phone or other device without losing the ECG. It can also be run with the device turned off, provided it has a connection. In some cases there may be problems when it is turned off. It is thus safest to keep it on while using it. This should not be a problem for a 30 second ECG. It may be a problem if you are collecting longer-term HR and RR data.</p>
+<h3 align="left">Exported CSV Data Formats</h3>
+<p align="left"><strong>ECG Data</strong></p>
+<p align="left">The name is of the form PolarECG-yyyy-MM-dd-HH-mm-ss.csv. The file consists of a header followed by the ECG voltages. There is only one column. The header consists of rows of the form: tag=value for each of these items:
+</p>
+<table style="border:0px solid black;margin-left:5%;margin-right:auto;">
+  <tr>
+    <th>Tag</th>
+    <th>Description of the Value</th>
+  </tr>
+  <tr>
+    <td>application</td>
+    <td>Name of the application</td>
+  </tr>
+  <tr>
+    <td>stoptime</td>
+    <td>Date/Time the recording stopped</td>
+  </tr>
+  <tr>
+    <td>duration</td>
+    <td>Duration in seconds</td>
+  </tr>
+  <tr>
+    <td>nsamples</td>
+    <td>Number of samples</td>
+  </tr>
+  <tr>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>samplingrate</td>
+    <td>Sampling rate in Hz</td>
+  </tr>
+  <tr>
+    <td>stopdevicehr</td>
+    <td>Device HR when recording stopped</td>
+  </tr>
+  <tr>
+    <td>stopcalculatedhr</td>
+    <td>Calculated HR when recording stopped</td>
+  </tr>
+  <tr>
+    <td>devicename</td>
+    <td>Name of the device</td>
+  </tr>
+  <tr>
+    <td>deviceid</td>
+    <td>ID for the device</td>
+  </tr>
+  <tr>
+    <td>battery</td>
+    <td>Device battery level</td>
+  </tr>
+  <tr>
+    <td>firmware</td>
+    <td>Device firmware</td>
+  </tr>
+  <tr>
+    <td>note</td>
+    <td>User supplied note</td>
+  </tr>
+</table>
+<p align="left">The ECG voltages in mV to 3 decimal places follow, one per line.</p>
+<p align="left">What is in the header may vary with the KE.Net version. Hopefully whatever is there will be self-explanatory. The characters up to the first = are the tag. Everything that follows on the line is the value. Note that no lines in the header can be parsed as a number. This is a way to distinguish header information from data. </p>
+<p align="left"><strong>Device HR Data </strong></p>
+<p align="left">The name is of the form PolarECG-DeviceHR-yyyy-MM-dd-HH-mm-ss.csv, and the values correspond to the stop time. The delimiter is a comma. The values are a timestamp, the HR value, and a space-separated list of RR values. The RR values are integers in units of 1/1024 sec, which is the raw data  from the device. </p>
+<p align="left"><strong>Calculated HR Data </strong></p>
+<p align="left">The name is of the form PolarECG-QRSHR-yyyy-MM-dd-HH-mm-ss.csv, and the values correspond to the stop time. The delimiter is a comma. The values are a timestamp, the HR value, and a space-separated list of RR values. The RR values are integers in units of 1/1024 sec, which is the raw data  from the device. </p>
 <h3 align="left"><a name="menu" id="menu"></a>Menu </h3>
 <p align="left">There is an icon on the Toolbar (if there is enough room) that depends on whether it is collecting data or not. When playing, the icon will be a Stop icon, and when stopped it will be a Play icon. It starts in the Playing mode, and will start showing ECG data as soon as it is connected and receiving them. In order to save or export data files, it needs to be stopped first. The Save menu items should not appear when playing. Also panning is not enabled when playing, but is when stopped. Panning is not ever enabled on the HR/RR plot owing to issues with AndroidPlot. When you start playing again, the current data is lost, and it starts over. </p>
-<p align="left"><strong>Save Data and Plot</strong></p>
-<p align="left">Saves the ECG data and the PNG image. </p>
-<p align="left"><strong>Save All</strong></p>
-<p align="left">Saves everything that can be saved. This includes the ECG data CSV file, PNG image, and CSV files for both the sensor and internal algorithm HR and RR values.</p>
-<p align="left"><strong></strong><strong>Save Plot</strong></p>
-<p align="left">Saves only the PNG image.</p>
-<p align="left"><strong>Save Data </strong></p>
-<p align="left">Saves a CSV file with  the ECG data.</p>
-<p align="left"><strong>Save Sensor HR Data</strong></p>
-<p align="left">Saves a CSV file for the sensor  HR and RR values.     </p>
-<p align="left"><strong>Save Calculated HR Data</strong></p>
-<p align="left">Saves a CSV file for the internal algorithm HR and RR values. </p>
+<p align="left"><strong>Save</strong></p>
+<p align="left">This is a menu with sub-menu items related to saving data in several ways. It only appears when recording is stopped. There are four types of data files that can be saved. The menu lists options for saving all these,  just the ECG data and plot image, or each item individually. </p>
+<div style="margin-left:2%;">
+	<p align="left"><strong>Save All</strong></p>
+	<p align="left">You will be prompted for a note to describe the reading. It is not used for the HR and RR values. Saves everything that can be saved. This includes the ECG data CSV file, PNG image, and CSV files for both the sensor and internal algorithm HR and RR values. </p>
+	<p align="left"><strong>Save Data and Plot</strong></p>
+	<p align="left">You will be prompted for a note to describe the reading. Saves the ECG data and the PNG image. </p>
+	<p align="left"><strong>Save Plot</strong></p>
+	<p align="left">You will be prompted for a note to describe the reading. Saves only the PNG image.</p>
+	<p align="left"><strong>Save Data </strong></p>
+	<p align="left">You will be prompted for a note to describe the reading. Saves a CSV file with  the ECG data.</p>
+	<p align="left"><strong>Save Device HR Data</strong></p>
+	<p align="left">Saves a CSV file for the sensor  HR and RR values.     </p>
+	<p align="left"><strong>Save Calculated HR Data</strong></p>
+	<p align="left">Saves a CSV file for the internal algorithm HR and RR values. </p>
+</div>
 <p align="left"><strong>Set Device ID </strong></p>
 <p align="left">Allows you to set the device ID for your H10. You can also do this in Settings, but this is a more complete interface, allowing you to select from values you have most recently used. (That might be useful if you have more than one H10.) The device ID has to be set the first time or the app will not be able to find your device.</p>
 <p align="left"><strong>Set Data Directory</strong></p>
