@@ -66,8 +66,8 @@ public class HRPlotter implements IConstants, IQRSConstants {
     public SimpleXYSeries mHrSeries2;
     public SimpleXYSeries mRrSeries2;
 
-    public List<HrRrData> mHrRrList1 = new ArrayList<>();
-    public List<HrRrData> mHrRrList2 = new ArrayList<>();
+    public List<HrRrSessionData> mHrRrList1 = new ArrayList<>();
+    public List<HrRrSessionData> mHrRrList2 = new ArrayList<>();
 
     private final ReentrantReadWriteLock mLock =
             new ReentrantReadWriteLock(true);
@@ -254,7 +254,7 @@ public class HRPlotter implements IConstants, IQRSConstants {
         mLock.writeLock().lock();
         try {
             if (mPlotHr1 || mPlotRr1) {
-                mHrRrList1.add(new HrRrData(time, hr, rrsMs));
+                mHrRrList1.add(new HrRrSessionData(time, hr, rrsMs));
 //            StringBuilder sb = new StringBuilder();
 //            sb.append("HRPlotter: addValues1");
 //            sb.append(" time=");
@@ -345,7 +345,7 @@ public class HRPlotter implements IConstants, IQRSConstants {
         mLock.writeLock().lock();
         try {
             if (mPlotHr2 || mPlotRr2) {
-                mHrRrList2.add(new HrRrData(time, hr, rr));
+                mHrRrList2.add(new HrRrSessionData(time, hr, rr));
 //            Log.d(TAG, "HRPlotter: addValues2"
 //                    + " time=" + X_AXIS_DATE_FORMAT.format(new Date(Math
 //                    .round(time)))
@@ -563,8 +563,14 @@ public class HRPlotter implements IConstants, IQRSConstants {
         }
     }
 
-    public static class HrRrData {
-        // THis is the same formatter as sessionSaveFormatter in Bluetooth
+    /**
+     * Class for handling data to be written to a Session file as used by
+     * Bluetooth Cardiac Monitor (BCM) and HxM Monitor.  Note that RR for
+     * session data is in units of 1/1024 sec, not ms. THis is the raw unit
+     * for RR in the BLE packet.
+     */
+    public static class HrRrSessionData {
+        // This is the same formatter as sessionSaveFormatter in Bluetooth
         // Cardiac Monitor.
         private static final SimpleDateFormat sdf = new SimpleDateFormat(
                 "yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
@@ -572,22 +578,29 @@ public class HRPlotter implements IConstants, IQRSConstants {
         private final String hr;
         private final String rr;
 
-        public HrRrData(double time, double hr, List<Integer> rrsMs) {
+        public HrRrSessionData(double time, double hr, List<Integer> rrsMs) {
             this.time = sdf.format(new Date(Math.round(time)));
             this.hr = String.format(Locale.US, "%.0f", hr);
             StringBuilder sb = new StringBuilder();
             for (Integer rr : rrsMs) {
-                sb.append(rr).append(" ");
+                // Convert ms to 1/1024 sec.
+                sb.append(Math.round(1.024 * rr)).append(" ");
             }
             this.rr = sb.toString().trim();
         }
 
-        public HrRrData(double time, double hr, double rr) {
+        public HrRrSessionData(double time, double hr, double rr) {
             this.time = sdf.format(new Date(Math.round(time)));
             this.hr = String.format(Locale.US, "%.0f", hr);
-            this.rr = String.format(Locale.US, "%.0f", rr);
+            // Convert ms to 1/1024 sec.
+            this.rr = String.format(Locale.US, "%d", Math.round(1.024 * rr));
         }
 
+        /***
+         * Gets a string for writing session files. These have RR in units
+         * of 1/1024 sec, not ms.
+         * @return The string
+         */
         public String getCVSString() {
             return String.format("%s,%s,%s", time, hr, rr);
         }

@@ -985,7 +985,7 @@ public class ECGActivity extends AppCompatActivity
         String format = "yyyy-MM-dd_HH-mm";
         SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
         String fileName;
-        List<HRPlotter.HrRrData> dataList;
+        List<HRPlotter.HrRrSessionData> dataList;
         try {
             if (saveType == SaveType.DEVICE_HR) {
                 fileName = "PolarECG-DeviceHR-" + df.format(mStopTime) + ".csv";
@@ -1014,9 +1014,9 @@ public class ECGActivity extends AppCompatActivity
                     openFileDescriptor(docUri, "w");
             try (FileWriter writer = new FileWriter(pfd.getFileDescriptor());
                  PrintWriter out = new PrintWriter((writer))) {
-                // Write header
+                // Write header (None)
                 // Write samples
-                for (HRPlotter.HrRrData data : dataList) {
+                for (HRPlotter.HrRrSessionData data : dataList) {
                     out.write(data.getCVSString() + "\n");
                 }
                 out.flush();
