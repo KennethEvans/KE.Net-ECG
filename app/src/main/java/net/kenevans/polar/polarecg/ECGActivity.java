@@ -217,7 +217,7 @@ public class ECGActivity extends AppCompatActivity
                         // PREF_QRS_VISIBILITY
                         mUseQRSPlot = mSharedPreferences.getBoolean(
                                 PREF_QRS_VISIBILITY, true);
-                        resetQRSVisibility();
+                        setQRSVisibility();
                     });
 
     @Override
@@ -315,7 +315,7 @@ public class ECGActivity extends AppCompatActivity
 
         // Set the visibility of the QRS plot
         mUseQRSPlot = mSharedPreferences.getBoolean(PREF_QRS_VISIBILITY, true);
-        resetQRSVisibility();
+        setQRSVisibility();
 
         // Start the connection to the device
         Log.d(TAG, "    mDeviceId=" + mDeviceId);
@@ -609,12 +609,12 @@ public class ECGActivity extends AppCompatActivity
         long lastVal;
         if (mHRPlotter.mHrSeries1 != null && mHRPlotter.mHrSeries1.size() > 0) {
             lastVal = Math.round(
-                    mHRPlotter.mHrSeries1.getxVals().getLast().doubleValue());
+                    mHRPlotter.mHrSeries1.getyVals().getLast().doubleValue());
             mDeviceStopHR = String.format(Locale.US, "%d", lastVal);
         }
         if (mHRPlotter.mHrSeries2 != null && mHRPlotter.mHrSeries2.size() > 0) {
             lastVal = Math.round(
-                    mHRPlotter.mHrSeries2.getxVals().getLast().doubleValue());
+                    mHRPlotter.mHrSeries2.getyVals().getLast().doubleValue());
             mCalcStopHR = String.format(Locale.US, "%d", lastVal);
         }
     }
@@ -1313,10 +1313,10 @@ public class ECGActivity extends AppCompatActivity
     }
 
     /**
-     * Resets the QRS plot visibility from the current value of mUseQRSPlot.
+     * Sets the QRS plot visibility from the current value of mUseQRSPlot.
      */
-    private void resetQRSVisibility() {
-        Log.d(TAG, this.getClass().getSimpleName() + " resetQRSVisibility:");
+    private void setQRSVisibility() {
+        Log.d(TAG, this.getClass().getSimpleName() + " setQRSVisibility:");
         if (mQRSPlot != null) {
             if (mUseQRSPlot) {
                 mQRSPlot.setVisibility(View.VISIBLE);
