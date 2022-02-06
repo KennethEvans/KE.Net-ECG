@@ -32,19 +32,23 @@ public class QRSPlotter implements IConstants, IQRSConstants {
     private ECGActivity mActivity;
     private XYPlot mPlot;
 
+    // ECG
     private XYSeriesFormatter<XYRegionFormatter> mFormatter1;
-    private SimpleXYSeries mSeries1;
+    public SimpleXYSeries mSeries1;
+    // Average
     private XYSeriesFormatter<XYRegionFormatter> mFormatter2;
-    private SimpleXYSeries mSeries2;
+    public SimpleXYSeries mSeries2;
+    // Score
     private XYSeriesFormatter<XYRegionFormatter> mFormatter3;
-    private SimpleXYSeries mSeries3;
+    public SimpleXYSeries mSeries3;
+    // Peaks
     private XYSeriesFormatter<XYRegionFormatter> mFormatter4;
-    private SimpleXYSeries mSeries4;
+    public SimpleXYSeries mSeries4;
 
     /**
      * The next index in the data (or the length of the series.)
      */
-    private long mDataIndex;
+    public long mDataIndex;
 
     /**
      * Flag to indicate setup should be run again. (Owing to gridRect not
@@ -92,22 +96,22 @@ public class QRSPlotter implements IConstants, IQRSConstants {
         mFormatter1 = new LineAndPointFormatter(Color.rgb(0, 153, 255),
                 null, null, null);
         mFormatter1.setLegendIconEnabled(false);
-        mSeries1 = new SimpleXYSeries("Series 1");
+        mSeries1 = new SimpleXYSeries("ECG");
 
         mFormatter2 = new LineAndPointFormatter(Color.YELLOW,
                 null, null, null);
         mFormatter2.setLegendIconEnabled(false);
-        mSeries2 = new SimpleXYSeries("Series 2");
+        mSeries2 = new SimpleXYSeries("Average");
 
         mFormatter3 = new LineAndPointFormatter(Color.GREEN,
                 null, null, null);
         mFormatter3.setLegendIconEnabled(false);
-        mSeries3 = new SimpleXYSeries("Series 3");
+        mSeries3 = new SimpleXYSeries("Score");
 
         mFormatter4 = new LineAndPointFormatter(null,
                 Color.RED, null, null);
         mFormatter4.setLegendIconEnabled(false);
-        mSeries4 = new SimpleXYSeries("Series 4");
+        mSeries4 = new SimpleXYSeries("Peaks");
 
         mLock.writeLock().lock();
         try {
@@ -468,15 +472,26 @@ public class QRSPlotter implements IConstants, IQRSConstants {
         mLock.writeLock().lock();
         try {
             // Remove old values if needed
-            long xMin = mDataIndex - N_TOTAL_POINTS;
-            while (mSeries4.size() > 0 && (int) mSeries4.getxVals().getFirst() < xMin) {
-                mSeries4.removeFirst();
-//                Log.d(TAG, "sample=" + sample + " deleted="
-//                + mSeries4.getxVals().getFirst());
-            }
+            removeOutOfRangeValues();
             mSeries4.addLast(sample, ecg);
 //        Log.d(TAG, "added sample=" + sample + " size=" + mSeries4.size()
 //                + " xmin=" + xMin + " mDataIndex=" + mDataIndex);
+        } finally {
+            mLock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Removes peaks with indices that are no longer in range.
+     */
+    public void removeOutOfRangeValues() {
+        mLock.writeLock().lock();
+        try {
+            // Remove old values if needed
+            long xMin = mDataIndex - N_TOTAL_POINTS;
+            while (mSeries4.size() > 0 && (int) mSeries4.getxVals().getFirst() < xMin) {
+                mSeries4.removeFirst();
+            }
         } finally {
             mLock.writeLock().unlock();
         }

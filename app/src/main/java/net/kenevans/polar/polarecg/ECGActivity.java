@@ -11,12 +11,14 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.text.InputType;
@@ -46,7 +48,6 @@ import org.reactivestreams.Publisher;
 
 import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
@@ -111,16 +112,16 @@ public class ECGActivity extends AppCompatActivity
     private boolean mPlaying;
     private Menu mMenu;
     private String mDeviceId = "";
-    private String mFirmware = "Unknown";
-    private String mName = "Unknown";
-    private String mAddress = "Unknown";
-    private String mBatteryLevel = "Unknown";
+    private String mFirmware = "NA";
+    private String mName = "NA";
+    private String mAddress = "NA";
+    private String mBatteryLevel = "NA";
     //* Device HR when stopped playing. Updated whenever playing started or
     // stopped. */
-    private String mDeviceStopHR;
+    private String mDeviceStopHR = "NA";
     //* Calculated HR when stopped playing. Updated whenever playing started
     // or stopped. */
-    private String mCalcStopHR;
+    private String mCalcStopHR = "NA";
     //* Date when stopped playing. Updated whenever playing started or
     // stopped. */
     private Date mStopTime;
@@ -604,7 +605,7 @@ public class ECGActivity extends AppCompatActivity
      * Sets the last HR from the series in the HR plotter.
      */
     public void setLastHr() {
-        mDeviceStopHR = mCalcStopHR = "Unknown";
+        mDeviceStopHR = mCalcStopHR = "NA";
         if (mHRPlotter == null) return;
         long lastVal;
         if (mHRPlotter.mHrSeries1 != null && mHRPlotter.mHrSeries1.size() > 0) {
@@ -873,10 +874,14 @@ public class ECGActivity extends AppCompatActivity
                     openFileDescriptor(docUri, "w");
             try (FileOutputStream strm =
                          new FileOutputStream(pfd.getFileDescriptor())) {
-                final LinkedList<Number> vals =
-                        mECGPlotter.getSeries().getyVals();
-                final int nSamples = vals.size();
-                Bitmap bm = EcgImage.createImage(this, FS,
+                Bitmap logo = BitmapFactory.decodeResource(this.getResources(),
+                        R.drawable.polar_ecg);
+                PlotArrays arrays = getPlotArrays();
+                final double[] ecgvals = arrays.ecg;
+                final boolean[] peakvals = arrays.peaks;
+                mECGPlotter.getSeries().getyVals();
+                final int nSamples = ecgvals.length;
+                Bitmap bm = EcgImage.createImage(FS, logo,
                         patientName,
                         mStopTime.toString(),
                         mDeviceId,
@@ -884,16 +889,19 @@ public class ECGActivity extends AppCompatActivity
                         mBatteryLevel,
                         note,
                         mDeviceStopHR,
-                        String.format(Locale.US, "%.1f " +
-                                "sec", nSamples / FS),
-                        vals);
+                        mCalcStopHR,
+                        String.format(Locale.US, "%d",
+                                mQRSPlotter.mSeries4.size()),
+                        String.format(Locale.US, "%.1f sec", nSamples / FS),
+                        ecgvals,
+                        peakvals);
                 bm.compress(Bitmap.CompressFormat.PNG, 80, strm);
                 strm.close();
                 msg = "Wrote " + docUri.getLastPathSegment();
                 Log.d(TAG, msg);
                 Utils.infoMsg(this, msg);
             }
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             msg = "Error saving plot";
             Log.e(TAG, msg);
             Log.e(TAG, Log.getStackTraceString(ex));
@@ -961,7 +969,7 @@ public class ECGActivity extends AppCompatActivity
                 Log.d(TAG, msg);
                 Utils.infoMsg(this, msg);
             }
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             msg = "Error writing CSV file";
             Log.e(TAG, msg);
             Log.e(TAG, Log.getStackTraceString(ex));
@@ -1024,12 +1032,56 @@ public class ECGActivity extends AppCompatActivity
                 Utils.infoMsg(this, msg);
                 Log.d(TAG, "    Wrote " + dataList.size() + " items");
             }
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             msg = "Error writing " + saveType + " CSV file";
             Log.e(TAG, msg);
             Log.e(TAG, Log.getStackTraceString(ex));
             Utils.excMsg(this, msg, ex);
         }
+    }
+
+    /**
+     * Gets ECG and Peaks and converts them into doubles. This relies on the
+     * ecg arrays in ECGPlotter and QRSPlotter being the same and also the
+     * respective mDataIndex's. The ones in QRSPlotter are used. It also has
+     * the peak values.
+     *
+     * @return PlotArrays with the ECG and peak values.
+     */
+    public PlotArrays getPlotArrays() {
+        PlotArrays arrays;
+        // Remove any out-of-range values peak values
+        mQRSPlotter.removeOutOfRangeValues();
+        LinkedList<Number> ecgvals = mQRSPlotter.mSeries1.getyVals();
+        LinkedList<Number> peakvals = mQRSPlotter.mSeries4.getyVals();
+        LinkedList<Number> peakxvals = mQRSPlotter.mSeries4.getxVals();
+        int ecglen = ecgvals.size();
+        int peakslen = peakvals.size();
+
+        double[] ecg = new double[ecglen];
+        boolean[] peaks = new boolean[ecglen];
+        int i = 0;
+        for (Number val : ecgvals) {
+            ecg[i] = val.doubleValue();
+            peaks[i] = false;
+            i++;
+        }
+        // The peak values correspond to an index related to when they came in.
+        // This is different from the index in the arrays, which goes from 0
+        // to no more than N_TOTAL_POINTS.
+        int offset = 0;
+        if (mQRSPlotter.mDataIndex > N_TOTAL_POINTS) {
+            offset = -(int) (mQRSPlotter.mDataIndex - N_TOTAL_POINTS);
+        }
+        int indx;
+        for (int j = 0; j < peakslen; j++) {
+            indx = peakxvals.get(j).intValue() + offset;
+//            Log.d(TAG, String.format("j=%d indx=%d xval=%d",
+//                    j, indx, peakxvals.get(j).intValue()));
+            peaks[indx] = true;
+        }
+        arrays = new PlotArrays(ecg, peaks);
+        return arrays;
     }
 
     public void redoPlotSetup() {
@@ -1054,16 +1106,17 @@ public class ECGActivity extends AppCompatActivity
         msg.append("API Connected: ").append(mApi != null).append("\n");
         msg.append("Device Connected: ").append(mConnected).append("\n");
         msg.append("Playing: ").append(mPlaying).append("\n");
-        msg.append("Receiving ECG: ").append(mEcgDisposable != null).append(
-                "\n");
+        msg.append("Receiving ECG: ").append(mEcgDisposable != null)
+                .append("\n");
         if (mECGPlotter != null && mECGPlotter.getSeries() !=
                 null && mECGPlotter.getSeries().getyVals() != null) {
             double elapsed = mECGPlotter.getDataIndex() / FS;
             msg.append("Elapsed Time: ")
-                    .append(getString(R.string.elapsed_time, elapsed)).append("\n");
+                    .append(getString(R.string.elapsed_time, elapsed))
+                    .append("\n");
             msg.append("Points plotted: ")
-                    .append(mECGPlotter.getSeries().getyVals().size()).append(
-                    "\n");
+                    .append(mECGPlotter.getSeries().getyVals().size())
+                    .append("\n");
         }
         String versionName = "NA";
         try {
@@ -1357,7 +1410,7 @@ public class ECGActivity extends AppCompatActivity
                         PolarBleApi.FEATURE_HR);
         // DEBUG
         // Post a Runnable to have plots to be setup again in 1 sec
-        final Handler handler = new Handler();
+        final Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(() -> {
 //            Log.d(TAG,
 //                    "No connection handler: time=" + sdfShort.format(new
@@ -1473,6 +1526,9 @@ public class ECGActivity extends AppCompatActivity
         Log.d(TAG, "    restart(end) mApi=" + mApi + " mPlaying=" + mPlaying);
     }
 
+    /**
+     * Class to hold a name and device ID.
+     */
     public static class DeviceInfo {
         public String name;
         public String id;
@@ -1480,6 +1536,22 @@ public class ECGActivity extends AppCompatActivity
         public DeviceInfo(String name, String id) {
             this.name = name;
             this.id = id;
+        }
+    }
+
+    /**
+     * Class to hold arrays for plotting.  The ecg array is the ECG values.
+     * The peaks arrays is the same length and is true or false depending on if
+     * the ECG value corrsponds to a peak. These are arrays as opposed to the
+     * LinkedList's in the respective series.
+     */
+    public static class PlotArrays {
+        public double[] ecg;
+        public boolean[] peaks;
+
+        public PlotArrays(double[] ecg, boolean[] peaks) {
+            this.ecg = ecg;
+            this.peaks = peaks;
         }
     }
 }

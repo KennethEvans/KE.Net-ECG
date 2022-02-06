@@ -497,7 +497,7 @@ public class HRPlotter implements IConstants, IQRSConstants {
      * Updates the plot. Runs on the UI thread.
      */
     public void update() {
-//        Log.d(TAG, "HRPLotter: update: dataList sizes=" + mHrRrList1.size()
+//        Log.d(TAG, "HRPlotter: update: dataList sizes=" + mHrRrList1.size()
 //                + "," + mHrRrList2.size());
         mLock.writeLock().lock();
         try {

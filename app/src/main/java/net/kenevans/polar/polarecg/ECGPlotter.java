@@ -37,7 +37,7 @@ public class ECGPlotter implements IConstants, IQRSConstants {
     /**
      * The next index in the data (or the length of the series.)
      */
-    private long mDataIndex;
+    public long mDataIndex;
 
     /**
      * Flag to indicate setup should be run again. (Owing to gridRect not
@@ -532,7 +532,7 @@ public class ECGPlotter implements IConstants, IQRSConstants {
             sb.append("Range Origin=").append(mPlot.getRangeOrigin()).append(LF);
             long timeVal = mPlot.getDomainOrigin().longValue();
             Date date = new Date(timeVal);
-            sb.append("Domain Origin=").append(date.toString()).append(LF);
+            sb.append("Domain Origin=").append(date).append(LF);
             sb.append("Range Step Value=").append(mPlot.getRangeStepValue())
                     .append(LF);
             sb.append("Domain Step Value=").append(mPlot.getDomainStepValue())
