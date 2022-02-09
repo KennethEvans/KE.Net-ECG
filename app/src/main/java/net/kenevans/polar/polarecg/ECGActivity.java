@@ -941,8 +941,11 @@ public class ECGActivity extends AppCompatActivity
             try (FileWriter writer = new FileWriter(pfd.getFileDescriptor());
                  PrintWriter out = new PrintWriter((writer))) {
                 // Write header
-                LinkedList<Number> vals = mECGPlotter.getSeries().getyVals();
-                int nSamples = vals.size();
+                PlotArrays arrays = getPlotArrays();
+                final double[] ecgvals = arrays.ecg;
+                final boolean[] peakvals = arrays.peaks;
+                int nPeaks = mQRSPlotter.mSeries4.size();
+                int nSamples = ecgvals.length;
                 String duration = String.format(Locale.US, "%.1f sec",
                         nSamples / FS);
                 out.write("application=" + "KE.Net ECG Version: "
@@ -953,6 +956,7 @@ public class ECGActivity extends AppCompatActivity
                 out.write("samplingrate=" + FS + "\n");
                 out.write("stopdevicehr=" + mDeviceStopHR + "\n");
                 out.write("stopcalculatedhr=" + mCalcStopHR + "\n");
+                out.write("npeaks=" + nPeaks + "\n");
                 out.write("devicename=" + mName + "\n");
                 out.write("deviceid=" + mDeviceId + "\n");
                 out.write("battery=" + mBatteryLevel + "\n");
@@ -960,9 +964,9 @@ public class ECGActivity extends AppCompatActivity
                 out.write("note=" + note + "\n");
 
                 // Write samples
-                for (Number val : vals) {
-                    out.write(String.format(Locale.US, "%.3f\n",
-                            val.doubleValue()));
+                for (int i = 0; i < nSamples; i++) {
+                    out.write(String.format(Locale.US, "%.3f,%d\n", ecgvals[i],
+                            peakvals[i] ? 1 : 0));
                 }
                 out.flush();
                 msg = "Wrote " + docUri.getLastPathSegment();

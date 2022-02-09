@@ -46,16 +46,12 @@ class EcgImage {
                               String duration,
                               double[] ecgvals,
                               boolean[] peakvals) {
+        // Graphics
         Bitmap bm = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888);
         bm.eraseColor(Color.WHITE);
         Canvas canvas = new Canvas(bm);
-        Typeface font = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
-        Typeface fontBold = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD);
-        Typeface fontInfo = Typeface.create(Typeface.SANS_SERIF,
-                Typeface.NORMAL);
-        Typeface fontLogo = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD);
 
-        // General use, paramters will change
+        // General use, parameters will change
         Paint paint = new Paint();
         paint.setColor(Color.BLACK);
         paint.setTextSize(36);
@@ -65,8 +61,14 @@ class EcgImage {
         paint1.setColor(Color.BLACK);
         paint1.setStrokeWidth(OUTLINE_WIDTH);
 
-        paint.setTextSize(36);
+        // Fonts
+        Typeface font = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
+        Typeface fontBold = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD);
+        Typeface fontInfo = Typeface.create(Typeface.SANS_SERIF,
+                Typeface.NORMAL);
+        Typeface fontLogo = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD);
 
+        // Headers
         paint.setTypeface(fontBold);
         canvas.drawText("Patient:", 100, 120, paint);
         paint.setTypeface(font);
@@ -143,6 +145,7 @@ class EcgImage {
             drawScaled(canvas, GRAPH_X, GRAPH_Y + i, GRAPH_X + GRAPH_WIDTH,
                     GRAPH_Y + i, paint);
         }
+
         // Draw the large grid lines
         paint.setStrokeWidth(MAJOR_WIDTH);
         paint.setColor(MAJOR_COLOR);
@@ -154,6 +157,7 @@ class EcgImage {
             drawScaled(canvas, GRAPH_X, GRAPH_Y + i, GRAPH_X + GRAPH_WIDTH,
                     GRAPH_Y + i, paint);
         }
+
         // Draw the block grid lines
         paint.setStrokeWidth(BLOCK_WIDTH);
         paint.setColor(BLOCK_COLOR);
@@ -165,6 +169,7 @@ class EcgImage {
             drawScaled(canvas, GRAPH_X, GRAPH_Y + i, GRAPH_X + GRAPH_WIDTH,
                     GRAPH_Y + i, paint);
         }
+
         // Draw the outline
         paint.setStrokeWidth(OUTLINE_WIDTH);
         paint.setColor(OUTLINE_COLOR);

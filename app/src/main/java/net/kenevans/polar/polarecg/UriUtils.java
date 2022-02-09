@@ -47,8 +47,12 @@ public class UriUtils implements IConstants {
         try (Cursor cursor = context.getContentResolver().query(uri, null, null,
                 null, null)) {
             cursor.moveToFirst();
-            displayName =
-                    cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
+            int colIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+            if (colIndex < 0) {
+                displayName = "NA";
+            } else {
+                displayName = cursor.getString(colIndex);
+            }
         } catch (Exception ex) {
             Utils.excMsg(context, "Error getting display name", ex);
         }
