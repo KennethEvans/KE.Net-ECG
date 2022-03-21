@@ -226,6 +226,14 @@ public class ECGActivity extends AppCompatActivity
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         Log.d(TAG, this.getClass().getSimpleName() + " onCreate");
         super.onCreate(savedInstanceState);
+        // Capture global exceptions
+        Thread.setDefaultUncaughtExceptionHandler((paramThread,
+                                                   paramThrowable) -> {
+            Log.e(TAG, "Unexpected exception :", paramThrowable);
+            // Any non-zero exit code
+            System.exit(2);
+        });
+
         setContentView(R.layout.activity_ecg);
         mTextViewHR = findViewById(R.id.hr);
         mTextViewInfo = findViewById(R.id.info);
@@ -380,14 +388,6 @@ public class ECGActivity extends AppCompatActivity
             mMenu.findItem(R.id.pause).setTitle("Start");
             mMenu.findItem(R.id.save).setVisible(true);
         }
-
-        // Capture global exceptions
-        Thread.setDefaultUncaughtExceptionHandler((paramThread,
-                                                   paramThrowable) -> {
-            Log.e(TAG, "Unexpected exception :", paramThrowable);
-            // Any non-zero exit code
-            System.exit(2);
-        });
         return true;
     }
 
