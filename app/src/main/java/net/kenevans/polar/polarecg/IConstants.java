@@ -25,7 +25,7 @@ public interface IConstants {
     String PREF_PATIENT_NAME = "patientName";
     String PREF_QRS_VISIBILITY = "qrsVisibility";
 
-    int REQ_ACCESS_LOCATION = 1;
+    int REQ_ACCESS_PERMISSIONS = 1;
     int REQ_SETTINGS = 15;
 //    int REQ_ENABLE_BLUETOOTH = 2;
 //    int REQ_GET_TREE = 10;

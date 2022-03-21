@@ -4,7 +4,7 @@ android {
     compileSdkVersion 31
     defaultConfig {
         applicationId "net.kenevans.polar.polarecg"
-        minSdkVersion 21
+        minSdkVersion 23
         targetSdkVersion 31
         versionCode 10
         versionName "2.0.0"

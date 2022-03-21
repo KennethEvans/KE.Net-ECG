@@ -1,38 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="net.kenevans.polar.polarecg">
+    package="net.kenevans.polar.polarecg">
 
-    <uses-permission android:name="android.permission.BLUETOOTH"/>
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- For below Android 12 -->
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="30"
+        android:targetSdkVersion="31" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30"
+        android:targetSdkVersion="31" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30"
+        android:targetSdkVersion="31" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30"
+        android:targetSdkVersion="31" />
+    <!-- For Android 12 and above -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT"
+        android:minSdkVersion="31"
+        android:targetSdkVersion="31" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:minSdkVersion="31"
+        android:usesPermissionFlags="neverForLocation" />
 
     <application
         android:allowBackup="true"
         android:fullBackupOnly="true"
-        android:label="@string/app_name"
         android:icon="@mipmap/ic_polar_ecg"
+        android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_polar_ecg_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
             android:name="net.kenevans.polar.polarecg.ECGActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
-            android:exported="true"
-        >
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
+                <action android:name="android.intent.action.MAIN" />
 
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".InfoActivity" android:label="@string/help_title">
-        </activity>
+        <!--suppress CheckTagEmptyBody -->
         <activity
-            android:theme="@style/SettingsTheme"
+            android:name=".InfoActivity"
+            android:label="@string/help_title"></activity>
+        <!--suppress CheckTagEmptyBody -->
+        <activity
             android:name="net.kenevans.polar.polarecg.SettingsActivity"
             android:exported="true"
-            android:label="@string/settings_title">
-        </activity>
+            android:label="@string/settings_title"
+            android:theme="@style/SettingsTheme"></activity>
     </application>
 
 </manifest>

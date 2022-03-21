@@ -166,6 +166,9 @@ public class Utils implements IConstants {
      */
     @SuppressWarnings("unused")
     public static String getHashCode(Object obj) {
+        if (obj == null) {
+            return "null";
+        }
         return String.format("%08X", obj.hashCode());
     }
 
@@ -175,6 +178,7 @@ public class Utils implements IConstants {
      * @param ctx The context.
      * @return The package name.
      */
+    @SuppressWarnings("unused")
     public static String getVersion(Context ctx) {
         String versionName = "NA";
         try {
@@ -192,6 +196,7 @@ public class Utils implements IConstants {
      * @param ctx The Context.
      * @return Either "Portrait" or "Landscape".
      */
+    @SuppressWarnings("unused")
     public static String getOrientation(Context ctx) {
         int orientation = ctx.getResources().getConfiguration().orientation;
         if (orientation == Configuration.ORIENTATION_PORTRAIT) {
@@ -209,6 +214,7 @@ public class Utils implements IConstants {
      * @param prefs  The given Preferences.
      * @return The info/
      */
+    @SuppressWarnings("unused")
     public static String getSharedPreferencesInfo(String prefix,
                                                   SharedPreferences prefs) {
         Map<String, ?> map = prefs.getAll();

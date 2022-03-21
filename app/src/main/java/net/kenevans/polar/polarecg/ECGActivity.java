@@ -5,7 +5,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.content.ContentResolver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -67,7 +66,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.preference.PreferenceManager;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
@@ -95,6 +93,9 @@ public class ECGActivity extends AppCompatActivity
     public boolean mOrientationChangedECG = false;
     public boolean mOrientationChangedQRS = false;
     public boolean mOrientationChangedHR = false;
+
+    private boolean mBleSupported;
+    private boolean mAllPermissionsAsked;
 
     private boolean mConnected = false;
 
@@ -257,7 +258,6 @@ public class ECGActivity extends AppCompatActivity
         // Start Bluetooth
         mDeviceId = mSharedPreferences.getString(PREF_DEVICE_ID, "");
         Log.d(TAG, "    mDeviceId=" + mDeviceId);
-        checkBT();
         Gson gson = new Gson();
         Type type = new TypeToken<LinkedList<DeviceInfo>>() {
         }.getType();
@@ -270,6 +270,22 @@ public class ECGActivity extends AppCompatActivity
         if (mDeviceId == null || mDeviceId.equals("")) {
             selectDeviceId();
         }
+
+        // Use this check to determine whether BLE is supported on the device.
+        // Then you can selectively disable BLE-related features.
+        if (!getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_BLUETOOTH_LE)) {
+            String msg = getString(R.string.ble_not_supported);
+            Utils.warnMsg(this, msg);
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+            mBleSupported = false;
+            return;
+        } else {
+            mBleSupported = true;
+        }
+
+        // Ask for needed permissions
+        requestPermissions();
     }
 
     @Override
@@ -326,11 +342,19 @@ public class ECGActivity extends AppCompatActivity
             Toast.makeText(this,
                     getString(R.string.noDevice),
                     Toast.LENGTH_SHORT).show();
-            return;
         } else {
             restart();
         }
-        Log.d(TAG, "    onResume(end) mPlaying=" + mPlaying);
+//        Log.d(TAG, "    onResume(end) mPlaying=" + mPlaying);
+    }
+
+    @Override
+    public void onBackPressed() {
+        // This seems to be necessary with Android 12
+        // Otherwise onDestroy is not called
+        Log.d(TAG, this.getClass().getSimpleName() + ": onBackPressed");
+        finish();
+        super.onBackPressed();
     }
 
     @Override
@@ -356,6 +380,14 @@ public class ECGActivity extends AppCompatActivity
             mMenu.findItem(R.id.pause).setTitle("Start");
             mMenu.findItem(R.id.save).setVisible(true);
         }
+
+        // Capture global exceptions
+        Thread.setDefaultUncaughtExceptionHandler((paramThread,
+                                                   paramThrowable) -> {
+            Log.e(TAG, "Unexpected exception :", paramThrowable);
+            // Any non-zero exit code
+            System.exit(2);
+        });
         return true;
     }
 
@@ -583,16 +615,53 @@ public class ECGActivity extends AppCompatActivity
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[]
             permissions, @NonNull int[] grantResults) {
+        Log.d(TAG, this.getClass().getSimpleName()
+                + "onRequestPermissionsResult");
         super.onRequestPermissionsResult(requestCode, permissions,
                 grantResults);
-        Log.d(TAG, this.getClass().getSimpleName() + ": " +
-                "onRequestPermissionsResult:" + " permissions=" +
-                permissions[0]);
-        Log.d(TAG, "    grantResults=" + grantResults[0]);
-        Log.d(TAG, "    requestCode=" + requestCode
-                + " ACCESS_LOCATION_REQ="
-                + REQ_ACCESS_LOCATION
-        );
+        if (requestCode == REQ_ACCESS_PERMISSIONS) {// All (Handle multiple)
+            for (int i = 0; i < permissions.length; i++) {
+                if (permissions[i].equals(Manifest.
+                        permission.ACCESS_COARSE_LOCATION)) {
+                    if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                        Log.d(TAG, "REQ_ACCESS_PERMISSIONS: COARSE_LOCATION " +
+                                "granted");
+                    } else if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                        Log.d(TAG, "REQ_ACCESS_PERMISSIONS: COARSE_LOCATION " +
+                                "denied");
+                    }
+                } else if (permissions[i].equals(Manifest.
+                        permission.ACCESS_FINE_LOCATION)) {
+                    if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                        Log.d(TAG, "REQ_ACCESS_PERMISSIONS: FINE_LOCATION " +
+                                "granted");
+                    } else if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                        Log.d(TAG, "REQ_ACCESS_PERMISSIONS: FINE_LOCATION " +
+                                "denied");
+                    }
+                } else if (permissions[i].equals(Manifest.
+                        permission.BLUETOOTH_SCAN)) {
+                    if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                        Log.d(TAG, "REQ_ACCESS_PERMISSIONS: BLUETOOTH_SCAN " +
+                                "granted");
+                    } else if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                        Log.d(TAG, "REQ_ACCESS_PERMISSIONS: BLUETOOTH_SCAN " +
+                                "denied");
+                    }
+                } else if (permissions[i].equals(Manifest.
+                        permission.BLUETOOTH_CONNECT)) {
+                    if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                        Log.d(TAG, "REQ_ACCESS_PERMISSIONS: BLUETOOTH_CONNECT" +
+                                " " +
+                                "granted");
+                    } else if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                        Log.d(TAG, "REQ_ACCESS_PERMISSIONS: BLUETOOTH_CONNECT" +
+                                " " +
+                                "denied");
+                    }
+                }
+            }
+        }
     }
 
     @Override
@@ -665,27 +734,24 @@ public class ECGActivity extends AppCompatActivity
         items[mMruDevices.size()] = "New";
         int checkedItem = 0;
         dialog[0].setSingleChoiceItems(items, checkedItem,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        if (which < mMruDevices.size()) {
-                            DeviceInfo deviceInfo = mMruDevices.get(which);
-                            String oldDeviceId = mDeviceId;
-                            setDeviceMruPref(deviceInfo);
-                            Log.d(TAG, "which=" + which
-                                    + " name=" + deviceInfo.name + " id="
-                                    + deviceInfo.id);
-                            Log.d(TAG,
-                                    "selectDeviceId: oldDeviceId=" + oldDeviceId
-                                            + " mDeviceId=" + mDeviceId);
-                            if (!oldDeviceId.equals(mDeviceId)) {
-                                resetDeviceId(oldDeviceId);
-                            }
-                        } else {
-                            showDeviceIdDialog(null);
+                (dialogInterface, which) -> {
+                    if (which < mMruDevices.size()) {
+                        DeviceInfo deviceInfo1 = mMruDevices.get(which);
+                        String oldDeviceId = mDeviceId;
+                        setDeviceMruPref(deviceInfo1);
+                        Log.d(TAG, "which=" + which
+                                + " name=" + deviceInfo1.name + " id="
+                                + deviceInfo1.id);
+                        Log.d(TAG,
+                                "selectDeviceId: oldDeviceId=" + oldDeviceId
+                                        + " mDeviceId=" + mDeviceId);
+                        if (!oldDeviceId.equals(mDeviceId)) {
+                            resetDeviceId(oldDeviceId);
                         }
-                        dialog.dismiss();
+                    } else {
+                        showDeviceIdDialog(null);
                     }
+                    dialogInterface.dismiss();
                 });
         dialog[0].setNegativeButton(R.string.cancel,
                 (dialog1, which) -> dialog1.dismiss());
@@ -711,25 +777,22 @@ public class ECGActivity extends AppCompatActivity
         dialog.setView(viewInflated);
 
         dialog.setPositiveButton(R.string.ok,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        String oldDeviceId = mDeviceId;
-                        mDeviceId = input.getText().toString();
-                        Log.d(TAG, "showDeviceIdDialog: OK:  oldDeviceId="
-                                + oldDeviceId + " newDeviceId="
-                                + mDeviceId);
-                        SharedPreferences.Editor editor =
-                                mSharedPreferences.edit();
-                        editor.putString(PREF_DEVICE_ID, mDeviceId);
-                        editor.apply();
-                        if (mDeviceId == null || mDeviceId.isEmpty()) {
-                            Toast.makeText(ECGActivity.this,
-                                    getString(R.string.noDevice),
-                                    Toast.LENGTH_SHORT).show();
-                        } else if (!oldDeviceId.equals(mDeviceId)) {
-                            resetDeviceId(oldDeviceId);
-                        }
+                (dialogInterface, which) -> {
+                    String oldDeviceId = mDeviceId;
+                    mDeviceId = input.getText().toString();
+                    Log.d(TAG, "showDeviceIdDialog: OK:  oldDeviceId="
+                            + oldDeviceId + " newDeviceId="
+                            + mDeviceId);
+                    SharedPreferences.Editor editor =
+                            mSharedPreferences.edit();
+                    editor.putString(PREF_DEVICE_ID, mDeviceId);
+                    editor.apply();
+                    if (mDeviceId == null || mDeviceId.isEmpty()) {
+                        Toast.makeText(ECGActivity.this,
+                                getString(R.string.noDevice),
+                                Toast.LENGTH_SHORT).show();
+                    } else if (!oldDeviceId.equals(mDeviceId)) {
+                        resetDeviceId(oldDeviceId);
                     }
                 });
         dialog.setNegativeButton(R.string.cancel,
@@ -1134,10 +1197,7 @@ public class ECGActivity extends AppCompatActivity
                 append(versionName).append("\n");
         msg.append("Polar BLE API Version: ").
                 append(PolarBleApiDefaultImpl.versionInfo()).append("\n");
-        msg.append("Location Permission: ")
-                .append((ContextCompat.checkSelfPermission(this, Manifest
-                        .permission.ACCESS_FINE_LOCATION) == PackageManager
-                        .PERMISSION_GRANTED)).append("\n");
+        msg.append(UriUtils.getRequestedPermissionsInfo(this));
         SharedPreferences prefs = getPreferences(MODE_PRIVATE);
         String treeUriStr = prefs.getString(PREF_TREE_URI, null);
         if (treeUriStr == null) {
@@ -1300,8 +1360,34 @@ public class ECGActivity extends AppCompatActivity
                 + sdf1.format(date) + " (" + ts + ")");
     }
 
-    public void checkBT() {
-        Log.d(TAG, "checkBT");
+    /**
+     * Determines if either COARSE or FINE location permission is granted.
+     *
+     * @return If granted.
+     */
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public static boolean isAllPermissionsGranted(Context ctx) {
+        boolean granted;
+        if (Build.VERSION.SDK_INT >= 31) {
+            // Android 12 (S)
+            granted = ctx.checkSelfPermission(
+                    Manifest.permission.BLUETOOTH_CONNECT) ==
+                    PackageManager.PERMISSION_GRANTED |
+                    ctx.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) ==
+                            PackageManager.PERMISSION_GRANTED;
+        } else {
+            // Android 6 (M)
+            granted = ctx.checkSelfPermission(
+                    Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED |
+                    ctx.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                            PackageManager.PERMISSION_GRANTED;
+        }
+        return granted;
+    }
+
+    public void requestPermissions() {
+        Log.d(TAG, "requestPermissions");
         BluetoothManager bluetoothManager =
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         if (bluetoothManager != null) {
@@ -1313,12 +1399,17 @@ public class ECGActivity extends AppCompatActivity
             }
         }
 
-        //requestPermissions() method needs to be called when the build SDK
-        // version is 23 or above
-        if (Build.VERSION.SDK_INT >= 23) {
-            this.requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
+        if (Build.VERSION.SDK_INT >= 31) {
+            // Android 12 (S)
+            this.requestPermissions(new String[]{
+                            Manifest.permission.BLUETOOTH_SCAN,
+                            Manifest.permission.BLUETOOTH_CONNECT},
+                    REQ_ACCESS_PERMISSIONS);
+        } else {
+            // Android 6 (M)
+            this.requestPermissions(new String[]{
                             Manifest.permission.ACCESS_FINE_LOCATION},
-                    REQ_ACCESS_LOCATION);
+                    REQ_ACCESS_PERMISSIONS);
         }
     }
 
@@ -1406,6 +1497,16 @@ public class ECGActivity extends AppCompatActivity
                 getString(R.string.connecting) + " " + mDeviceId,
                 Toast.LENGTH_SHORT).show();
 
+        // Don't use SDK if BT is not enabled or permissions are not granted.
+        if (!mBleSupported) return;
+        if (!isAllPermissionsGranted(this)) {
+            if (!mAllPermissionsAsked) {
+                mAllPermissionsAsked = true;
+                Utils.warnMsg(this, getString(R.string.permission_not_granted));
+            }
+            return;
+        }
+
         mApi = PolarBleApiDefaultImpl.defaultImplementation(this,
                 PolarBleApi.FEATURE_POLAR_SENSOR_STREAMING |
                         PolarBleApi.FEATURE_BATTERY_INFO |
@@ -1428,7 +1529,7 @@ public class ECGActivity extends AppCompatActivity
         mApi.setApiCallback(new PolarBleApiCallback() {
             @Override
             public void blePowerStateChanged(boolean b) {
-                Log.d(TAG, "*BluetoothStateChanged " + b);
+                Log.d(TAG, "BluetoothStateChanged " + b);
             }
 
             @Override
@@ -1527,7 +1628,7 @@ public class ECGActivity extends AppCompatActivity
             mStopTime = new Date();
         }
         invalidateOptionsMenu();
-        Log.d(TAG, "    restart(end) mApi=" + mApi + " mPlaying=" + mPlaying);
+//        Log.d(TAG, "    restart(end) mApi=" + mApi + " mPlaying=" + mPlaying);
     }
 
     /**
