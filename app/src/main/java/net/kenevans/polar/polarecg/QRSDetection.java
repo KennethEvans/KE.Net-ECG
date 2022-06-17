@@ -1,5 +1,7 @@
 package net.kenevans.polar.polarecg;
 
+import android.util.Log;
+
 import com.polar.sdk.api.model.PolarEcgData;
 
 import java.util.ArrayList;
@@ -8,12 +10,14 @@ import java.util.List;
 
 public class QRSDetection implements IConstants, IQRSConstants {
 
-    private ECGActivity mActivity;
+    private final ECGActivity mActivity;
 
-    private final FixedSizeList<Double> mPeaks = new FixedSizeList<>(DATA_WINDOW);
-    private FixedSizeList<Integer> mPeakIndices =
+    private final FixedSizeList<Double> mPeaks =
             new FixedSizeList<>(DATA_WINDOW);
-//    private final FixedSizeList<Double> mMaxAvg = new FixedSizeList<>(DATA_WINDOW);
+    private final FixedSizeList<Integer> mPeakIndices =
+            new FixedSizeList<>(DATA_WINDOW);
+    //    private final FixedSizeList<Double> mMaxAvg = new FixedSizeList<>
+    //    (DATA_WINDOW);
 //    private final FixedSizeList<Double> mMaxAvgIndices =
 //            new FixedSizeList<>(DATA_WINDOW);
     boolean mScoring = false;
@@ -39,18 +43,24 @@ public class QRSDetection implements IConstants, IQRSConstants {
 
     private final FixedSizeList<Double> curButterworth =
             new FixedSizeList<>(DATA_WINDOW);
-    private final FixedSizeList<Double> curDeriv = new FixedSizeList<>(DATA_WINDOW);
-    private final FixedSizeList<Double> curSquare = new FixedSizeList<>(DATA_WINDOW);
-    private final FixedSizeList<Double> curAvg = new FixedSizeList<>(DATA_WINDOW);
-//    private FixedSizeList<Double> curScore = new FixedSizeList<>(DATA_WINDOW);
-    private final FixedSizeList<Double> curEcg = new FixedSizeList<>(DATA_WINDOW);
+    private final FixedSizeList<Double> curDeriv =
+            new FixedSizeList<>(DATA_WINDOW);
+    private final FixedSizeList<Double> curSquare =
+            new FixedSizeList<>(DATA_WINDOW);
+    private final FixedSizeList<Double> curAvg =
+            new FixedSizeList<>(DATA_WINDOW);
+    //    private FixedSizeList<Double> curScore = new FixedSizeList<>
+    //    (DATA_WINDOW);
+    private final FixedSizeList<Double> curEcg =
+            new FixedSizeList<>(DATA_WINDOW);
 
     private final List<Double> ecgVals = new ArrayList<>();
 
     /**
      * Moving average of the data.
      */
-    private final RunningAverage movingAverage = new RunningAverage(MOV_AVG_WINDOW);
+    private final RunningAverage movingAverage =
+            new RunningAverage(MOV_AVG_WINDOW);
 
     /**
      * Moving average of the moving average heights
@@ -184,8 +194,16 @@ public class QRSDetection implements IConstants, IQRSConstants {
                     }
                 }
             }
-            // Don't count this one if the interval between R and S is too long
-            if (mMaxIndex - mMinIndex <= MAX_QRS_LENGTH) {
+            int scoreLen = mScoreEnd - mScoreStart;
+            int deltaRS = Integer.MAX_VALUE;
+            if (mMinIndex > -1 && mMaxIndex > -1) {
+                deltaRS = mMinIndex - mMaxIndex;
+            }
+            // Criterion for using this interval as containing a valid QRS
+            // complex
+            boolean useInterval = deltaRS >= 0 && deltaRS <= MAX_QRS_LENGTH
+                    && scoreLen > MAX_QRS_LENGTH / 2;
+            if (useInterval) {
                 // Do QRS plot
                 qrsPlotter().addPeakValue(mMaxIndex, peakEcgVal);
                 // Recalculate the threshold
@@ -193,10 +211,16 @@ public class QRSDetection implements IConstants, IQRSConstants {
                 threshold = MOV_AVG_HEIGHT_THRESHOLD_FACTOR
                         * movingAverageHeight.average();
             }
+//            // Debug
+//            Log.d(TAG, String.format("useInterval, mMinIndex, mMaxIndex, " +
+//                            "deltaRS, mMinEcg, mMaxEcg, scoreLen: %5b " +
+//                            "%4d %4d %4d %6.3f %6.3f %4d",
+//                    useInterval, mMinIndex, mMaxIndex, deltaRS,
+//                    mMinEcg, mMaxEcg, scoreLen));
             // Reset
             mMaxIndex = mMinIndex = -1;
             mMaxEcg = -Double.MAX_VALUE;
-            mMinEcg = -Double.MAX_VALUE;
+            mMinEcg = Double.MAX_VALUE;
         }
         if (mScoring) {
             if (mScoreStart == i) {
@@ -207,7 +231,7 @@ public class QRSDetection implements IConstants, IQRSConstants {
                 } else {
                     mMaxIndex = mMinIndex = -1;
                     mMaxEcg = -Double.MAX_VALUE;
-                    mMinEcg = -Double.MAX_VALUE;
+                    mMinEcg = Double.MAX_VALUE;
                 }
                 mMaxAvgHeight = input.getLast();
             } else {

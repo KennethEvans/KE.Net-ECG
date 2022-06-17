@@ -65,7 +65,7 @@ interface IQRSConstants {
      * intermediate or slightly prolonged. A QRS duration of greater than
      * 0.12 seconds is considered abnormal.
      */
-    int MAX_QRS_LENGTH = (int)Math.round(.10 * FS); // 13
+    int MAX_QRS_LENGTH = (int)Math.round(.12 * FS); // 13
     /**
      * The group delay, used for searching ecg for maxima.
      * Coefficients: bandpass=7, deriv=4, square=1, average=20.
