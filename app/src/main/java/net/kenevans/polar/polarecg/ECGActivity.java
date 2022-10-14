@@ -92,7 +92,8 @@ public class ECGActivity extends AppCompatActivity
 
     public boolean mOrientationChangedECG = false;
     public boolean mOrientationChangedQRS = false;
-    public boolean mOrientationChangedHR = false;
+    // Not used when androidScreenOrientation="portrait"
+//    public boolean mOrientationChangedHR = false;
 
     private boolean mBleSupported;
     private boolean mAllPermissionsAsked;
@@ -498,6 +499,9 @@ public class ECGActivity extends AppCompatActivity
                 + " time=" + sdfShort.format(new Date())
         );
         super.onConfigurationChanged(newConfig);
+/*
+        The following is when handling orientation change
+        Not used for anddoidScreenOrientation="portrait"
         mOrientationChangedECG = mOrientationChangedQRS =
                 mOrientationChangedHR = true;
 
@@ -574,6 +578,7 @@ public class ECGActivity extends AppCompatActivity
 //                    + " plot=" + Utils.getHashCode(mHRPlot)
 //            );
         });
+ */
     }
 
     /**
