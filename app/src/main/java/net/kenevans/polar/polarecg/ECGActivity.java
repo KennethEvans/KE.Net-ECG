@@ -876,7 +876,7 @@ public class ECGActivity extends AppCompatActivity
                 inflate(R.layout.device_id_dialog_layout, null, false);
 
         final EditText input = viewInflated.findViewById(R.id.input);
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setInputType(InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         dialog.setView(viewInflated);
 
         dialog.setPositiveButton(R.string.ok,
@@ -1192,9 +1192,15 @@ public class ECGActivity extends AppCompatActivity
         }
         String versionName = "NA";
         try {
-            versionName = getPackageManager()
-                    .getPackageInfo(getPackageName(), 0).versionName;
-
+            if (Build.VERSION.SDK_INT >= 33) {
+                versionName =
+                        getPackageManager().getPackageInfo(getPackageName(),
+                        PackageManager.PackageInfoFlags.of(0)).versionName;
+            } else {
+                versionName =
+                        getPackageManager().getPackageInfo(getPackageName(),
+                                0).versionName;
+            }
         } catch (Exception ex) {
             // Do nothing
         }
