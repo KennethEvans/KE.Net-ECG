@@ -871,14 +871,14 @@ public class ECGActivity extends AppCompatActivity
         AlertDialog.Builder dialog = new AlertDialog.Builder(this,
                 R.style.PolarTheme);
         dialog.setTitle(R.string.note_dialog_title);
-
         View viewInflated = LayoutInflater.from(getApplicationContext()).
                 inflate(R.layout.device_id_dialog_layout, null, false);
 
         final EditText input = viewInflated.findViewById(R.id.input);
-        input.setInputType(InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        input.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
         dialog.setView(viewInflated);
-
         dialog.setPositiveButton(R.string.ok,
                 (dialog1, which) -> {
                     switch (saveType) {
