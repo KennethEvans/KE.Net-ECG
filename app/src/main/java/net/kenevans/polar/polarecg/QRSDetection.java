@@ -1,7 +1,5 @@
 package net.kenevans.polar.polarecg;
 
-import android.util.Log;
-
 import com.polar.sdk.api.model.PolarEcgData;
 
 import java.util.ArrayList;
@@ -12,17 +10,25 @@ public class QRSDetection implements IConstants, IQRSConstants {
 
     private final ECGActivity mActivity;
 
-    private final FixedSizeList<Double> mPeaks =
-            new FixedSizeList<>(DATA_WINDOW);
     private final FixedSizeList<Integer> mPeakIndices =
             new FixedSizeList<>(DATA_WINDOW);
-    //    private final FixedSizeList<Double> mMaxAvg = new FixedSizeList<>
-    //    (DATA_WINDOW);
-//    private final FixedSizeList<Double> mMaxAvgIndices =
-//            new FixedSizeList<>(DATA_WINDOW);
-    boolean mScoring = false;
-    int mScoreStart = -1;
-    int mScoreEnd = -1;
+    private int mPeakIndex = -1;
+    private int mMinPeakIndex = -1;
+    private int mMaxPeakIndex = -1;
+
+    // Initialize these with observed values
+    private static final double STAT_INITIAL_MEAN = .00;
+    private static final double STAT_INITIAL_STDDEV = .1;
+    private static final double N_SIGMA = 1.0;
+    private static final int SEARCH_EXTEND = 2;
+
+    double mSumVals = STAT_INITIAL_MEAN * HR_200_INTERVAL;
+    double mSumSq = (STAT_INITIAL_STDDEV * STAT_INITIAL_STDDEV -
+            STAT_INITIAL_MEAN * STAT_INITIAL_MEAN) * HR_200_INTERVAL;
+    int mNStat = HR_200_INTERVAL;
+    double mMean = STAT_INITIAL_MEAN;
+    double mStdDev = STAT_INITIAL_STDDEV;
+    double mThreshold = mMean + N_SIGMA * mStdDev;
 
     private int mNSamples = 0;
     private double mStartTime = Double.NaN;
@@ -34,45 +40,17 @@ public class QRSDetection implements IConstants, IQRSConstants {
     // intermediate or slightly prolonged. A QRS duration of greater than
     // 0.12 seconds is considered abnormal. 0.12 ms = 16 samples. 0.10
     // samples = 13 samples.
-    double mMaxEcg = -Double.MAX_VALUE;
-    double mMinEcg = Double.MAX_VALUE;
-    int mMaxIndex = -1;
-    int mMinIndex = -1;
 
-    double mMaxAvgHeight = MOV_AVG_HEIGHT_DEFAULT;
-
-    private final FixedSizeList<Double> curButterworth =
-            new FixedSizeList<>(DATA_WINDOW);
+//    private final FixedSizeList<Double> curButterworth =
+//            new FixedSizeList<>(DATA_WINDOW);
     private final FixedSizeList<Double> curDeriv =
             new FixedSizeList<>(DATA_WINDOW);
-    private final FixedSizeList<Double> curSquare =
+    private final FixedSizeList<Double> curScore =
             new FixedSizeList<>(DATA_WINDOW);
-    private final FixedSizeList<Double> curAvg =
-            new FixedSizeList<>(DATA_WINDOW);
-    //    private FixedSizeList<Double> curScore = new FixedSizeList<>
-    //    (DATA_WINDOW);
     private final FixedSizeList<Double> curEcg =
             new FixedSizeList<>(DATA_WINDOW);
 
     private final List<Double> ecgVals = new ArrayList<>();
-
-    /**
-     * Moving average of the data.
-     */
-    private final RunningAverage movingAverage =
-            new RunningAverage(MOV_AVG_WINDOW);
-
-    /**
-     * Moving average of the moving average heights
-     */
-    private final RunningAverage movingAverageHeight =
-            new RunningAverage(MOV_AVG_HEIGHT_WINDOW);
-
-//    /**
-//     * Moving average of the HR.  Used to get the HR as 60 * avg(1/RR).
-//     */
-//    private RunningAverage movingAverageHr =
-//            new RunningAverage(MOV_AVG_HR_WINDOW);
 
     /**
      * Moving average of the RR. Used to get the HR as 60 / avgRR.
@@ -80,18 +58,8 @@ public class QRSDetection implements IConstants, IQRSConstants {
     private final RunningAverage movingAverageRr =
             new RunningAverage(MOV_AVG_HR_WINDOW);
 
-
-    double threshold;
-
     public QRSDetection(ECGActivity activity) {
         mActivity = activity;
-
-        //Initialize movingAverageHeight assuming avg peaks are
-        // MOV_AVG_HEIGHT_DEFAULT high. These values will pre-dispose the
-        // average in the beginning.
-        for (int i = 0; i < MOV_AVG_HEIGHT_WINDOW; i++) {
-            movingAverageHeight.add(MOV_AVG_HEIGHT_DEFAULT);
-        }
     }
 
     public void process(PolarEcgData polarEcgData) {
@@ -116,153 +84,160 @@ public class QRSDetection implements IConstants, IQRSConstants {
         if (Double.isNaN(mStartTime)) mStartTime = new Date().getTime();
         ecgVals.add(ecg);
         mNSamples++;
-
-        FixedSizeList<Double> input;
-        double doubleVal, peakEcgVal, hr, rr;
-        threshold =
-                MOV_AVG_HEIGHT_THRESHOLD_FACTOR * movingAverageHeight.average();
         curEcg.add(ecg);
 
-        // Butterworth
-        input = curEcg;
-        if (curButterworth.size() == DATA_WINDOW) curButterworth.remove(0);
-        curButterworth.add(0.);    // Doesn't matter
-        doubleVal = filter(A_BUTTERWORTH3, B_BUTTERWORTH3, input,
-                curButterworth);
-        curButterworth.set(curButterworth.size() - 1, doubleVal);
+        FixedSizeList<Double> input;
+        double doubleVal, hr, rr;
+        double variance;
 
-        // Derivative
-        input = curButterworth;
+//        // Butterworth
+//        input = curEcg;
+//        if (curButterworth.size() == DATA_WINDOW) curButterworth.remove(0);
+//        curButterworth.add(0.);    // Doesn't matter
+//        doubleVal = filter(A_BUTTERWORTH3, B_BUTTERWORTH3, input,
+//                curButterworth);
+//        curButterworth.set(curButterworth.size() - 1, doubleVal);
+
+        // Derivative (Only using positive part)
+        input = curEcg;
         curDeriv.add(0.);    // Doesn't matter
         doubleVal = filter(A_DERIVATIVE, B_DERIVATIVE, input,
                 curDeriv);
+        doubleVal = Math.max(doubleVal, 0);
         curDeriv.set(curDeriv.size() - 1, doubleVal);
 
-        // Square
-        input = curDeriv;
-        curSquare.add(0.);    // Doesn't matter
-        doubleVal = input.get(curDeriv.size() - 1);
-        doubleVal *= doubleVal;
-        curSquare.set(curSquare.size() - 1, doubleVal);
-
-        // Moving average
-        input = curSquare;
-        curAvg.add(0.);    // Doesn't matter
-        doubleVal = input.get(input.size() - 1);
-        movingAverage.add(doubleVal);
-        doubleVal = movingAverage.average();
-        curAvg.set(curAvg.size() - 1, doubleVal);
-
         // Score
-        input = curAvg;
-        int scoreVal;
-        double last;
+        mNStat++;
+        mSumVals += doubleVal;
+        mSumSq += doubleVal * doubleVal;
+        mMean = mSumVals / mNStat;
+        variance = mSumSq / mNStat + mMean * mMean;
+        mStdDev = Math.sqrt(variance);
+        mThreshold = mMean + N_SIGMA * mStdDev;
+        curScore.add(mThreshold);
+
+        double val, maxEcg, lastMaxEcgVal;
+        double scoreval;
+        int lastIndex, lastPeakIndex, startSearch, endSearch;
+
+        input = curDeriv;
         int i = mNSamples - 1;
-        // Base the threshold on the current average of the moving avg heights
-        // input.getLast = cur_avg.getLast is the last value of cur_avg
-        scoreVal = score(input.getLast(), threshold);
-//        curScore.add((double) scoreVal);
+
         // Process finding the peaks
-        if (mScoring && scoreVal == 0) {
-            mScoreEnd = i;
-            mScoring = false;
-        }
-        if (!mScoring && scoreVal == 1) {
-            mScoreStart = i;
-            mScoring = true;
-        }
-        if (!mScoring && mScoreEnd == i && mMaxIndex != -1) {
-            // End of interval, process the score
-            peakEcgVal = ecgVals.get(mMaxIndex);
-            mPeaks.add(peakEcgVal);
-            mPeakIndices.add(mMaxIndex);
-            // Do HR/RR plot
-            if (mPeaks.size() > 1) {
-                rr = 1000 / FS * (mMaxIndex - mPeakIndices.get(mPeaks.size() - 2));
-                hr = 60000. / rr;
-                if (!Double.isInfinite(hr)) {
+        if (i % HR_200_INTERVAL == 0) {
+            // End of interval, process this interval
+            if (i > 0 && mPeakIndex != -1) {
+//                Log.d(TAG, "doAlgorithm: " +
+//                        ".......... start processing interval i=" + i
+//                        + " mPeakIndex=" + mPeakIndex
+//                        + " mMinPeakIndex=" + mMinPeakIndex
+//                        + " mMaxPeakIndex=" + mMaxPeakIndex
+//                );
+                // There is an mPeakIndex != -1
+                // Look between mMinPeakIndex and mMaxPeakIndex for a the
+                // largest ecg value
+                startSearch = Math.max(i - HR_200_INTERVAL, mMinPeakIndex);
+                if (startSearch < 0) startSearch = 0;
+                endSearch = Math.min(i, mMaxPeakIndex + SEARCH_EXTEND);
+                maxEcg = -Double.MAX_VALUE;
+//                Log.d(TAG, "doAlgorithm: " +
+//                        ".......... start searching: startSearch="
+//                        + startSearch
+//                        + " endSearch=" + endSearch);
+                for (int i1 = startSearch; i1 < endSearch + 1; i1++) {
+                    if (ecgVals.get(i1) > maxEcg) {
+                        maxEcg = ecgVals.get(i1);
+                        mPeakIndex = i1;
+                    }
+                } // End of search
+//                Log.d(TAG, "doAlgorithm: " +
+//                        ".......... end searching: startSearch="
+//                        + startSearch
+//                        + " endSearch=" + endSearch
+//                        + " mPeakIndex=" + mPeakIndex
+//                        + " maxEcg=" + maxEcg
+//                );
+                // Check if there is a close one in the previous interval
+                if (mPeakIndices.size() > 0) {
+                    lastIndex = mPeakIndices.size() - 1; // last
+                    // index in mPeakIndices
+                    lastPeakIndex = mPeakIndices.get(lastIndex);
+                    if (mPeakIndex - lastPeakIndex < HR_200_INTERVAL) {
+                        lastMaxEcgVal = ecgVals.get(lastPeakIndex);
+                        if (maxEcg >= lastMaxEcgVal) {
+                            // Replace the old one
+                            mPeakIndices.setLast(mPeakIndex);
+                            qrsPlotter().replaceLastPeakValue(mPeakIndex,
+                                    maxEcg);
+//                            Log.d(TAG, "doAlgorithm: " +
+//                                    "replaceLastPeakValue:"
+//                                    + " mPeakIndex=" + mPeakIndex
+//                                    + ", maxEcg=" + maxEcg);
+                        }
+                    } else {
+                        // Is not near a previous one, add it
+                        mPeakIndices.add(mPeakIndex);
+                        qrsPlotter().addPeakValue(mPeakIndex,
+                                maxEcg);
+//                        Log.d(TAG, "doAlgorithm: " +
+//                                "addPeakValue:"
+//                                + " mPeakIndex=" + mPeakIndex
+//                                + ", maxEcg=" + maxEcg);
+                    }
+                } else {
+                    // First peak
+                    mPeakIndices.add(mPeakIndex);
+                    qrsPlotter().addPeakValue(mPeakIndex, maxEcg);
+//                    Log.d(TAG, "doAlgorithm: " +
+//                            "addPeakValue:"
+//                            + " mPeakIndex=" + mPeakIndex
+//                            + ", maxEcg=" + maxEcg);
+                }
+
+                // Do HR/RR plot
+                if (mPeakIndices.size() > 1) {
+                    rr = 1000 / FS * (mPeakIndex - mPeakIndices.get(mPeakIndices.size() - 2));
+                    hr = 60000. / rr;
+                    if (!Double.isInfinite(hr)) {
 //                    movingAverageHr.add(hr);
-                    movingAverageRr.add(rr);
-                    // Wait to start plotting until HR average is well defined
-                    if (movingAverageRr.size() >= MOV_AVG_HR_WINDOW) {
+                        movingAverageRr.add(rr);
+                        // Wait to start plotting until HR average is well
+                        // defined
+                        if (movingAverageRr.size() >= MOV_AVG_HR_WINDOW) {
 //                        hrPlotter().addValues2(mStartTime + 1000 *
 //                        mMaxIndex / FS,
 //                                movingAverageHr.average(), rr);
-                        hrPlotter().addValues2(mStartTime + 1000 * mMaxIndex / FS,
-                                60000. / movingAverageRr.average(), rr);
-                        hrPlotter().fullUpdate();
+                            hrPlotter().addValues2(mStartTime + 1000 * mPeakIndex / FS,
+                                    60000. / movingAverageRr.average(), rr);
+                            hrPlotter().fullUpdate();
+                        }
                     }
                 }
             }
-            int scoreLen = mScoreEnd - mScoreStart;
-            int deltaRS = Integer.MAX_VALUE;
-            if (mMinIndex > -1 && mMaxIndex > -1) {
-                deltaRS = mMinIndex - mMaxIndex;
-            }
-            // Criterion for using this interval as containing a valid QRS
-            // complex
-            boolean useInterval = deltaRS >= 0 && deltaRS <= MAX_QRS_LENGTH
-                    && scoreLen > MAX_QRS_LENGTH / 2;
-            if (useInterval) {
-                // Do QRS plot
-                qrsPlotter().addPeakValue(mMaxIndex, peakEcgVal);
-                // Recalculate the threshold
-                movingAverageHeight.add(mMaxAvgHeight);
-                threshold = MOV_AVG_HEIGHT_THRESHOLD_FACTOR
-                        * movingAverageHeight.average();
-            }
-//            // Debug
-//            Log.d(TAG, String.format("useInterval, mMinIndex, mMaxIndex, " +
-//                            "deltaRS, mMinEcg, mMaxEcg, scoreLen: %5b " +
-//                            "%4d %4d %4d %6.3f %6.3f %4d",
-//                    useInterval, mMinIndex, mMaxIndex, deltaRS,
-//                    mMinEcg, mMaxEcg, scoreLen));
-            // Reset
-            mMaxIndex = mMinIndex = -1;
-            mMaxEcg = -Double.MAX_VALUE;
-            mMinEcg = Double.MAX_VALUE;
-        }
-        if (mScoring) {
-            if (mScoreStart == i) {
-                // Start of interval, set up mScoring
-                if (i >= SCORE_OFFSET) {
-                    mMaxIndex = mMinIndex = i - SCORE_OFFSET;
-                    mMaxEcg = mMinEcg = ecgVals.get(i - SCORE_OFFSET);
-                } else {
-                    mMaxIndex = mMinIndex = -1;
-                    mMaxEcg = -Double.MAX_VALUE;
-                    mMinEcg = Double.MAX_VALUE;
-                }
-                mMaxAvgHeight = input.getLast();
-            } else {
-                // In interval, accumulate data
-                if (i >= SCORE_OFFSET) {
-                    last = ecgVals.get(i - SCORE_OFFSET);
-                    if (last > mMaxEcg) {
-                        mMaxEcg = last;
-                        mMaxIndex = i - SCORE_OFFSET;
-                    }
-                    if (last < mMinEcg) {
-                        mMinEcg = last;
-                        mMinIndex = i - SCORE_OFFSET;
-                    }
-                    last = input.getLast();
-                    if (last > mMaxAvgHeight) {
-                        mMaxAvgHeight = last;
-                    }
-                }
-            }
+            // Start a new interval
+            mPeakIndex = -1;
+            mMinPeakIndex = -1;
+            mMaxPeakIndex = -1;
+//            Log.d(TAG, "doAlgorithm: " +
+//                    ".......... end processing interval i=" + i);
+        } // End of end of process interval
+
+        // Check for max ecg
+        val = input.getLast();
+        scoreval = curScore.getLast();
+        if (val > scoreval) {
+            mPeakIndex = i;
+            if (mPeakIndex > mMaxPeakIndex)
+                mMaxPeakIndex = mPeakIndex;
+            if (mMinPeakIndex == -1 || mPeakIndex < mMinPeakIndex)
+                mMinPeakIndex = mPeakIndex;
         }
 
         // Plot
-        doubleVal = movingAverage.average();
-//        Log.d(TAG, String.format("ecg=%.3f avg=%.3f score=%d threshold=%.3f",
-//                ecg, doubleVal, scoreVal, threshold));
-//        Log.d(TAG, "i=" + i + " " + scoreVal + " mScoring=" + mScoring
-//                + " mScoreStart=" + mScoreStart
-//                + " mScoreEnd=" + mScoreEnd);
-        qrsPlotter().addValues(ecg, 10 * doubleVal, 0.5 * (double) scoreVal);
-//        mQRSPlotter.addValues(ecg, null, 0.5 * (double) scoreVal);
+        // Multipliers on curSquare and curScore should be the same
+        double scale_factor = 5;
+        qrsPlotter().addValues(ecg, scale_factor * curDeriv.getLast(),
+                scale_factor * curScore.getLast());
     }
 
     /**
@@ -303,18 +278,6 @@ public class QRSDetection implements IConstants, IQRSConstants {
             sumb += b[i] * x.get(lenx - i - 1);
         }
         return (sumb - suma) / a[0];
-    }
-
-    /**
-     * Scores a value to 0 or 1 depending on if is below the threshold or not.
-     *
-     * @param val       The value.
-     * @param threshold The threshold.
-     * @return The score.
-     */
-    public int score(double val, double threshold) {
-        if (val < threshold) return 0;
-        return 1;
     }
 
     public ECGPlotter ecgPlotter() {

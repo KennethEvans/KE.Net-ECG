@@ -66,19 +66,19 @@ interface IQRSConstants {
      * 0.12 seconds is considered abnormal.
      */
     int MAX_QRS_LENGTH = (int)Math.round(.12 * FS); // 13
-    /**
-     * The group delay, used for searching ecg for maxima.
-     * Coefficients: bandpass=7, deriv=4, square=1, average=20.
-     * Delay is (N-1)/2, N = number of coefficients for FIR filter.
-     * Varies 5 - 18 for Butterworth fs=130 low_cutoff=5 high_cutoff=20.
-     * 18 chosen empirically.
+    /***
+     * The heart rate interval. The algorithm is based on there being only one
+     * heart beat in this interval. Assumes maximum heart rate is 200.
      */
-    int SCORE_OFFSET = 18;
-
+    int HR_200_INTERVAL = (int) (60.0 / 200.0 * FS); // 39
     /**
      * How many seconds the domain interval is for the HRPlotter.
      */
     long HR_PLOT_DOMAIN_INTERVAL = 1 * 60000;  // 1 min
+    /**
+     * Number of standard deviations above mean to use to threshold.
+     */
+    int NUMBER_OF_STDDEV = 2;
 
 
     /**
@@ -104,8 +104,8 @@ interface IQRSConstants {
     /**
      * Filter coefficients for Pan Tompkins derivative
      */
-    double[] A_DERIVATIVE = {1};
-    double[] B_DERIVATIVE = {0.5, 0.25, -0.25, -0.5};
+    double[] A_DERIVATIVE = {12};
+    double[] B_DERIVATIVE = {25, -48, 36, -16, 3};
 
 
 }

@@ -35,7 +35,7 @@ public class QRSPlotter implements IConstants, IQRSConstants {
     // ECG
     private XYSeriesFormatter<XYRegionFormatter> mFormatter1;
     public SimpleXYSeries mSeries1;
-    // Average
+    // Square
     private XYSeriesFormatter<XYRegionFormatter> mFormatter2;
     public SimpleXYSeries mSeries2;
     // Score
@@ -98,28 +98,28 @@ public class QRSPlotter implements IConstants, IQRSConstants {
         mFormatter1.setLegendIconEnabled(false);
         mSeries1 = new SimpleXYSeries("ECG");
 
-        mFormatter2 = new LineAndPointFormatter(Color.YELLOW,
+        mFormatter2 = new LineAndPointFormatter(Color.rgb(255, 216, 0),
                 null, null, null);
         mFormatter2.setLegendIconEnabled(false);
-        mSeries2 = new SimpleXYSeries("Average");
+        mSeries2 = new SimpleXYSeries("Deriv");
 
-        mFormatter3 = new LineAndPointFormatter(Color.GREEN,
-                null, null, null);
+        mFormatter3 = new LineAndPointFormatter(Color.rgb(50, 205, 50),
+                null, null, null); // Crimson
         mFormatter3.setLegendIconEnabled(false);
-        mSeries3 = new SimpleXYSeries("Score");
+        mSeries3 = new SimpleXYSeries("Square");
 
-        mFormatter4 = new LineAndPointFormatter(null,
-                Color.RED, null, null);
+        mFormatter4 = new LineAndPointFormatter(null, Color.RED, null, null);
         mFormatter4.setLegendIconEnabled(false);
+//        ((LineAndPointFormatter)mFormatter4).getVertexPaint().setStrokeWidth(20);
         mSeries4 = new SimpleXYSeries("Peaks");
 
         mLock.writeLock().lock();
         try {
             mPlot.addListener(mPlotListener);
-            mPlot.addSeries(mSeries1, mFormatter1);
             mPlot.addSeries(mSeries2, mFormatter2);
             mPlot.addSeries(mSeries3, mFormatter3);
             mPlot.addSeries(mSeries4, mFormatter4);
+            mPlot.addSeries(mSeries1, mFormatter1);
             setupPlot();
         } finally {
             mLock.writeLock().unlock();
@@ -253,7 +253,8 @@ public class QRSPlotter implements IConstants, IQRSConstants {
             sb.append("    orientation=")
                     .append(Utils.getOrientation(mActivity)).append("\n");
             sb.append("    renderMode=").append(mPlot.getRenderMode()
-                    == Plot.RenderMode.USE_MAIN_THREAD ? "Main" : "Background")
+                            == Plot.RenderMode.USE_MAIN_THREAD ? "Main" :
+                            "Background")
                     .append("\n");
             Insets gridInsets = mPlot.getGraph().getGridInsets();
             Insets lineLabelInsets = mPlot.getGraph().getLineLabelInsets();
@@ -405,7 +406,7 @@ public class QRSPlotter implements IConstants, IQRSConstants {
                     .append(mActivity.mOrientationChangedQRS)
                     .append(" height=").append(mPlot.getHeight())
                     .append(" isLaidOut=").append(mPlot.isLaidOut()).append(
-                    "\n");
+                            "\n");
         } catch (Exception ex) {
             sb.append("    !!! Exception encountered in QRS getLogInfo:")
                     .append("\n        ").append(ex).append("\n        ")
@@ -420,9 +421,9 @@ public class QRSPlotter implements IConstants, IQRSConstants {
     /**
      * Implements a strip chart adding new data at the end.
      *
-     * @param val1 Value for the first series.
-     * @param val2 Value for the second series.
-     * @param val3 Value for the third series.
+     * @param val1 Value for the first series. Ecg
+     * @param val2 Value for the second series. Square
+     * @param val3 Value for the third series. Score
      */
     public void addValues(Number val1, Number val2, Number val3) {
 //        Log.d(TAG, this.getClass().getSimpleName()
@@ -474,8 +475,28 @@ public class QRSPlotter implements IConstants, IQRSConstants {
             // Remove old values if needed
             removeOutOfRangeValues();
             mSeries4.addLast(sample, ecg);
-//        Log.d(TAG, "added sample=" + sample + " size=" + mSeries4.size()
-//                + " xmin=" + xMin + " mDataIndex=" + mDataIndex);
+//        Log.d(TAG, "Added peak value: sample=" + sample + " size=" + mSeries4.size()
+//                + " ecg=" + ecg + " mDataIndex=" + mDataIndex);
+        } finally {
+            mLock.writeLock().unlock();
+        }
+    }
+
+    public void replaceLastPeakValue(int sample, double ecg) {
+//        Log.d(TAG, this.getClass().getSimpleName()
+//                + "addPeakValue: dataIndex=" + mDataIndex + " mSeriesSize="
+//                + mSeries4.size()
+//                + " sample=" + sample + " ecg=" + ecg);
+//
+        mLock.writeLock().lock();
+        try {
+            // Remove old values if needed
+            removeOutOfRangeValues();
+            mSeries4.removeLast();
+            mSeries4.addLast(sample, ecg);
+//            Log.d(TAG, "Replaced peak value: sample=" + sample + " size=" +
+//            mSeries4.size()
+//                    + " ecg=" + ecg + " mDataIndex=" + mDataIndex);
         } finally {
             mLock.writeLock().unlock();
         }
