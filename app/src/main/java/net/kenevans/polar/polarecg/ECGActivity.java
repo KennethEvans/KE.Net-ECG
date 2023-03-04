@@ -1199,7 +1199,7 @@ public class ECGActivity extends AppCompatActivity
             if (Build.VERSION.SDK_INT >= 33) {
                 versionName =
                         getPackageManager().getPackageInfo(getPackageName(),
-                        PackageManager.PackageInfoFlags.of(0)).versionName;
+                                PackageManager.PackageInfoFlags.of(0)).versionName;
             } else {
                 versionName =
                         getPackageManager().getPackageInfo(getPackageName(),
@@ -1540,7 +1540,8 @@ public class ECGActivity extends AppCompatActivity
                         + " after 1 minute");
             }
         }, 60000);
-        mApi.setApiLogger(msg -> Log.d("PolarAPI", msg));
+        // Allow logging from the SDK
+//        mApi.setApiLogger(msg -> Log.d("PolarAPI", msg));
         mApi.setApiCallback(new PolarBleApiCallback() {
             @Override
             public void blePowerStateChanged(boolean b) {

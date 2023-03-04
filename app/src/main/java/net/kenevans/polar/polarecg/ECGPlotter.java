@@ -1,12 +1,10 @@
 package net.kenevans.polar.polarecg;
 
-import android.graphics.Canvas;
 import android.graphics.RectF;
 import android.util.DisplayMetrics;
 import android.util.Log;
 
 import com.androidplot.Plot;
-import com.androidplot.PlotListener;
 import com.androidplot.ui.Insets;
 import com.androidplot.util.DisplayDimensions;
 import com.androidplot.util.PixelUtils;
@@ -24,7 +22,6 @@ import com.polar.sdk.api.model.PolarEcgData;
 
 import java.util.Date;
 import java.util.Locale;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @SuppressWarnings("WeakerAccess")
 public class ECGPlotter implements IConstants, IQRSConstants {
@@ -38,45 +35,6 @@ public class ECGPlotter implements IConstants, IQRSConstants {
      * The next index in the data (or the length of the series.)
      */
     public long mDataIndex;
-
-    /**
-     * Flag to indicate setup should be run again. (Owing to gridRect not
-     * being defined the first time.
-     */
-    private boolean mRequestSetup = false;
-
-    private final ReentrantReadWriteLock mLock =
-            new ReentrantReadWriteLock(true);
-    private final PlotListener mPlotListener = new PlotListener() {
-        @Override
-        public void onBeforeDraw(Plot source, Canvas canvas) {
-//            Log.d(TAG, "ECG onBeforeDraw");
-//            Log.d(TAG, "Thread=" + Thread.currentThread().getId()
-//                    + " " + Thread.currentThread().getId());
-//            Log.d(TAG, "    source=" + Utils.getHashCode(source)
-//                    + " mPlot=" + Utils.getHashCode(mPlot));
-//            Log.d(TAG, "    source width=" + source.getWidth()
-//                    + " mPlot width=" + mPlot.getWidth());
-//            Log.d(TAG, "    before: thread: " + Thread.currentThread()
-//            .getName()
-//                    + " writeHoldCount=" + mLock.getWriteHoldCount()
-//                    + " readHoldCount=" + mLock.getReadHoldCount()
-//                    + " isWriteLockedByCurrentThread="
-//                    + mLock.isWriteLockedByCurrentThread()
-//            );
-            mLock.writeLock().lock();
-        }
-
-        @Override
-        public void onAfterDraw(Plot source, Canvas canvas) {
-//            Log.d(TAG, "ECG onAfterDraw");
-            mLock.writeLock().unlock();
-            if (mRequestSetup) {
-                mRequestSetup = false;
-                mActivity.runOnUiThread(() -> setupPlot());
-            }
-        }
-    };
 
     /**
      * CTOR that just sets the plot.
@@ -99,15 +57,8 @@ public class ECGPlotter implements IConstants, IQRSConstants {
                 showVertices ? lineColor : null, null, null);
         mFormatter.setLegendIconEnabled(false);
         mSeries = new SimpleXYSeries(title);
-
-        mLock.writeLock().lock();
-        try {
-            mPlot.addListener(mPlotListener);
-            mPlot.addSeries(mSeries, mFormatter);
-            setupPlot();
-        } finally {
-            mLock.writeLock().unlock();
-        }
+        mPlot.addSeries(mSeries, mFormatter);
+        setupPlot();
     }
 
     /**
@@ -128,17 +79,8 @@ public class ECGPlotter implements IConstants, IQRSConstants {
         newPlotter.mDataIndex = this.mDataIndex;
         newPlotter.mFormatter = this.mFormatter;
         newPlotter.mSeries = this.mSeries;
-
-        newPlotter.mLock.writeLock().lock();
-        try {
-            mPlot.removeListener(mPlotListener);
-            newPlotter.mPlot.addListener(newPlotter.mPlotListener);
-            newPlotter.mPlot.addSeries(mSeries, mFormatter);
-            newPlotter.setupPlot();
-        } finally {
-            newPlotter.mLock.writeLock().unlock();
-        }
-
+        newPlotter.mPlot.addSeries(mSeries, mFormatter);
+        newPlotter.setupPlot();
         return newPlotter;
     }
 
@@ -154,7 +96,6 @@ public class ECGPlotter implements IConstants, IQRSConstants {
 //                + " isWriteLockedByCurrentThread="
 //                + mLock.isWriteLockedByCurrentThread()
 //        );
-        mLock.writeLock().lock();
         try {
             // Calculate the range limits to make the blocks be square.
             // A large box is .5 mV. rMax corresponds to half the total
@@ -164,16 +105,8 @@ public class ECGPlotter implements IConstants, IQRSConstants {
             if (gridRect == null) {
                 Log.d(TAG, "ECGPlotter.setupPLot: gridRect is null\n"
                         + "    thread: " + Thread.currentThread().getName()
-                        + " writeHoldCount=" + mLock.getWriteHoldCount()
-                        + " readHoldCount=" + mLock.getReadHoldCount()
-                        + " isWriteLockedByCurrentThread="
-                        + mLock.isWriteLockedByCurrentThread()
                 );
-                mRequestSetup = true;
                 return;
-//                String msg = "ECGPLotter.setupPLot: GridRect is null\n"
-//                        + "Y axis is not scaled";
-//                Utils.warnMsg(mActivity, msg);
             } else {
                 rMax = .25 * N_DOMAIN_LARGE_BOXES * gridRect.height()
                         / gridRect.width();
@@ -223,8 +156,6 @@ public class ECGPlotter implements IConstants, IQRSConstants {
                     + " height=" + mPlot.getHeight();
             Utils.excMsg(mActivity, msg, ex);
             Log.e(TAG, msg, ex);
-        } finally {
-            mLock.writeLock().unlock();
         }
     }
 
@@ -232,12 +163,12 @@ public class ECGPlotter implements IConstants, IQRSConstants {
     public String getLogInfo(double rMax) {
         RectF gridRect = mPlot.getGraph().getGridRect();
         StringBuilder sb = new StringBuilder();
-        mLock.readLock().lock();
         try {
             sb.append("    orientation=")
                     .append(Utils.getOrientation(mActivity)).append("\n");
             sb.append("    renderMode=").append(mPlot.getRenderMode()
-                    == Plot.RenderMode.USE_MAIN_THREAD ? "Main" : "Background")
+                            == Plot.RenderMode.USE_MAIN_THREAD ? "Main" :
+                            "Background")
                     .append("\n");
             Insets gridInsets = mPlot.getGraph().getGridInsets();
             Insets lineLabelInsets = mPlot.getGraph().getLineLabelInsets();
@@ -386,26 +317,19 @@ public class ECGPlotter implements IConstants, IQRSConstants {
                     .append(" mOrientationChangedECG=")
                     .append(mActivity.mOrientationChangedECG)
                     .append(" height=").append(mPlot.getHeight()).append(" " +
-                    "isLaidOut=")
+                            "isLaidOut=")
                     .append(mPlot.isLaidOut()).append("\n");
         } catch (Exception ex) {
             sb.append("    !!! Exception encountered in ECG getLogInfo:")
                     .append("\n        ").append(ex).append("\n        ")
                     .append(ex.getMessage());
             return sb.toString();
-        } finally {
-            mLock.readLock().unlock();
         }
         return sb.toString();
     }
 
     public SimpleXYSeries getSeries() {
-        mLock.readLock().lock();
-        try {
-            return mSeries;
-        } finally {
-            mLock.readLock().unlock();
-        }
+        return mSeries;
     }
 
     /**
@@ -420,37 +344,30 @@ public class ECGPlotter implements IConstants, IQRSConstants {
         int nSamples = polarEcgData.samples.size();
         if (nSamples == 0) return;
 
-        mLock.writeLock().lock();
-        try {
-            // Add the new values, removing old values if needed
-            for (Integer val : polarEcgData.samples) {
-                if (mSeries.size() >= N_TOTAL_POINTS) {
-                    mSeries.removeFirst();
-                }
+        // Add the new values, removing old values if needed
+        for (Integer val : polarEcgData.samples) {
+            if (mSeries.size() >= N_TOTAL_POINTS) {
+                mSeries.removeFirst();
+            }
 //            // DEBUG Generate test values +- 1 mV
 //            double testVal = 0.0;
 //            if ((mDataIndex % 25) == 0) testVal = -1.0;
 //            if ((mDataIndex % 50) == 0) testVal = 1.0;
 //            mSeries.addLast(mDataIndex++, testVal);
 
-                // Convert from  μV to mV and add to series
-                mSeries.addLast(mDataIndex++, MICRO_TO_MILLI_VOLT * val);
-            }
-            // Reset the domain boundaries
-            updateDomainBoundaries();
-            update();
-        } finally {
-            mLock.writeLock().unlock();
+            // Convert from  μV to mV and add to series
+            mSeries.addLast(mDataIndex++, MICRO_TO_MILLI_VOLT * val);
         }
+        // Reset the domain boundaries
+        updateDomainBoundaries();
+        update();
     }
 
     public void updateDomainBoundaries() {
         long plotMin, plotMax;
         plotMin = mDataIndex - N_ECG_PLOT_POINTS;
         plotMax = mDataIndex;
-        mLock.writeLock().lock();
-        try {
-            mPlot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
+        mPlot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
 //            Log.d(TAG, this.getClass().getSimpleName() + " updatePlot: "
 //                    + "plotMin=" + plotMin + " plotmax=" + plotMax
 //                    + " size=" + mSeries.size());
@@ -458,9 +375,6 @@ public class ECGPlotter implements IConstants, IQRSConstants {
 //            .getColor();
 //            String hexColor = String.format("#%06X", (0xFFFFFF & colorInt));
 //            Log.d(TAG, "gridBgColor=" + hexColor);
-        } finally {
-            mLock.writeLock().unlock();
-        }
     }
 
     /**
@@ -483,12 +397,7 @@ public class ECGPlotter implements IConstants, IQRSConstants {
 //                + " plotter=" + Utils.getHashCode(this)
 //                + " plot=" + Utils.getHashCode(mPlot)
 //        );
-        mLock.writeLock().lock();
-        try {
-            mActivity.runOnUiThread(mPlot::redraw);
-        } finally {
-            mLock.writeLock().unlock();
-        }
+        mActivity.runOnUiThread(mPlot::redraw);
     }
 
     /**
@@ -497,16 +406,11 @@ public class ECGPlotter implements IConstants, IQRSConstants {
      * @param on Whether to be on or off (true for on).
      */
     public void setPanning(boolean on) {
-        mLock.writeLock().lock();
-        try {
-            if (on) {
-                PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL,
-                        PanZoom.Zoom.NONE);
-            } else {
-                PanZoom.attach(mPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
-            }
-        } finally {
-            mLock.writeLock().unlock();
+        if (on) {
+            PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL,
+                    PanZoom.Zoom.NONE);
+        } else {
+            PanZoom.attach(mPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
         }
     }
 
@@ -518,40 +422,35 @@ public class ECGPlotter implements IConstants, IQRSConstants {
         final String LF = "\n";
         StringBuilder sb = new StringBuilder();
 
-        mLock.readLock().lock();
-        try {
-            if (mPlot == null) {
-                sb.append("Plot is null");
-                return sb.toString();
+        if (mPlot == null) {
+            sb.append("Plot is null");
+            return sb.toString();
+        }
+        sb.append("Title=").append(mPlot.getTitle().getText()).append(LF);
+        sb.append("Range Title=").append(mPlot.getRangeTitle().getText())
+                .append(LF);
+        sb.append("Domain Title=").append(mPlot.getDomainTitle().getText())
+                .append(LF);
+        sb.append("Range Origin=").append(mPlot.getRangeOrigin()).append(LF);
+        long timeVal = mPlot.getDomainOrigin().longValue();
+        Date date = new Date(timeVal);
+        sb.append("Domain Origin=").append(date).append(LF);
+        sb.append("Range Step Value=").append(mPlot.getRangeStepValue())
+                .append(LF);
+        sb.append("Domain Step Value=").append(mPlot.getDomainStepValue())
+                .append(LF);
+        sb.append("Graph Width=").append(mPlot.getGraph().getSize()
+                .getWidth().getValue()).append(LF);
+        sb.append("Graph Height=").append(mPlot.getGraph().getSize()
+                .getHeight().getValue()).append(LF);
+        sb.append("mDataIndex=").append(mDataIndex).append(LF);
+        if (mSeries != null) {
+            if (mSeries.getxVals() != null) {
+                sb.append("mSeries Size=")
+                        .append(mSeries.getxVals().size()).append(LF);
             }
-            sb.append("Title=").append(mPlot.getTitle().getText()).append(LF);
-            sb.append("Range Title=").append(mPlot.getRangeTitle().getText())
-                    .append(LF);
-            sb.append("Domain Title=").append(mPlot.getDomainTitle().getText())
-                    .append(LF);
-            sb.append("Range Origin=").append(mPlot.getRangeOrigin()).append(LF);
-            long timeVal = mPlot.getDomainOrigin().longValue();
-            Date date = new Date(timeVal);
-            sb.append("Domain Origin=").append(date).append(LF);
-            sb.append("Range Step Value=").append(mPlot.getRangeStepValue())
-                    .append(LF);
-            sb.append("Domain Step Value=").append(mPlot.getDomainStepValue())
-                    .append(LF);
-            sb.append("Graph Width=").append(mPlot.getGraph().getSize()
-                    .getWidth().getValue()).append(LF);
-            sb.append("Graph Height=").append(mPlot.getGraph().getSize()
-                    .getHeight().getValue()).append(LF);
-            sb.append("mDataIndex=").append(mDataIndex).append(LF);
-            if (mSeries != null) {
-                if (mSeries.getxVals() != null) {
-                    sb.append("mSeries Size=")
-                            .append(mSeries.getxVals().size()).append(LF);
-                }
-            } else {
-                sb.append("mSeries=Null").append(LF);
-            }
-        } finally {
-            mLock.readLock().unlock();
+        } else {
+            sb.append("mSeries=Null").append(LF);
         }
         return sb.toString();
     }
@@ -560,14 +459,9 @@ public class ECGPlotter implements IConstants, IQRSConstants {
      * Clears the plot and resets dataIndex.
      */
     public void clear() {
-        mLock.writeLock().lock();
-        try {
-            mDataIndex = 0;
-            mSeries.clear();
-            update();
-        } finally {
-            mLock.writeLock().unlock();
-        }
+        mDataIndex = 0;
+        mSeries.clear();
+        update();
     }
 
     public long getDataIndex() {

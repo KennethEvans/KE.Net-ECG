@@ -9,6 +9,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.util.Log;
@@ -223,7 +224,7 @@ public class UriUtils implements IConstants {
             sb.append(permission.getUri()).append("\n");
             sb.append("    time=").
                     append(new Date(permission.getPersistedTime())).append(
-                    "\n");
+                            "\n");
             sb.append("    access=").append(permission.isReadPermission() ?
                     "R" : "").append(permission.isWritePermission() ? "W" :
                     "").append("\n");
@@ -243,10 +244,18 @@ public class UriUtils implements IConstants {
     public static int getApplicationUid(Context context) {
         int uid = -1;
         try {
-            ApplicationInfo info =
-                    context.getPackageManager().getApplicationInfo(
-                            context.getPackageName(), 0);
-            uid = info.uid;
+            ApplicationInfo info;
+            if (Build.VERSION.SDK_INT >= 33) {
+                info = context.getPackageManager()
+                .getApplicationInfo(context.getPackageName(),
+                        PackageManager.ApplicationInfoFlags.of(0));
+            } else {
+                info = context.getPackageManager()
+                        .getApplicationInfo(context.getPackageName(), 0);
+            }
+            if (info != null) {
+                uid = info.uid;
+            }
         } catch (Exception ex) {
             Log.e(TAG, "getApplicationUid: Failed to get UID", ex);
         }

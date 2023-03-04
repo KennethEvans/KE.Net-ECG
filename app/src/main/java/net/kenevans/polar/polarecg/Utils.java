@@ -24,7 +24,9 @@ package net.kenevans.polar.polarecg;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
 
@@ -175,15 +177,21 @@ public class Utils implements IConstants {
     /**
      * Get the version name for the application with the specified context.
      *
-     * @param ctx The context.
+     * @param context The context.
      * @return The package name.
      */
     @SuppressWarnings("unused")
-    public static String getVersion(Context ctx) {
+    public static String getVersion(Context context) {
         String versionName = "NA";
         try {
-            versionName = ctx.getPackageManager()
-                    .getPackageInfo(ctx.getPackageName(), 0).versionName;
+            if (Build.VERSION.SDK_INT >= 33) {
+                versionName = context.getPackageManager()
+                        .getPackageInfo(context.getPackageName(),
+                                PackageManager.PackageInfoFlags.of(0)).versionName;
+            } else {
+                versionName = context.getPackageManager()
+                        .getPackageInfo(context.getPackageName(), 0).versionName;
+            }
         } catch (Exception ex) {
             // Do nothing
         }

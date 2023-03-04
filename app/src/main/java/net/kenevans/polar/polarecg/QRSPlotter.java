@@ -1,6 +1,5 @@
 package net.kenevans.polar.polarecg;
 
-import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.RectF;
 import android.util.DisplayMetrics;
@@ -8,7 +7,6 @@ import android.util.Log;
 import android.view.View;
 
 import com.androidplot.Plot;
-import com.androidplot.PlotListener;
 import com.androidplot.ui.Insets;
 import com.androidplot.util.DisplayDimensions;
 import com.androidplot.util.PixelUtils;
@@ -25,7 +23,6 @@ import com.androidplot.xy.XYSeriesFormatter;
 
 import java.util.Date;
 import java.util.Locale;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @SuppressWarnings("WeakerAccess")
 public class QRSPlotter implements IConstants, IQRSConstants {
@@ -49,32 +46,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
      * The next index in the data (or the length of the series.)
      */
     public long mDataIndex;
-
-    /**
-     * Flag to indicate setup should be run again. (Owing to gridRect not
-     * being defined the first time.
-     */
-    private boolean mRequestSetup = false;
-
-    private final ReentrantReadWriteLock mLock =
-            new ReentrantReadWriteLock(true);
-    private final PlotListener mPlotListener = new PlotListener() {
-        @Override
-        public void onBeforeDraw(Plot source, Canvas canvas) {
-//            Log.d(TAG, "QRS onBeforeDraw");
-            mLock.writeLock().lock();
-        }
-
-        @Override
-        public void onAfterDraw(Plot source, Canvas canvas) {
-//            Log.d(TAG, "QRS onAfterDraw");
-            mLock.writeLock().unlock();
-            if (mRequestSetup) {
-                mRequestSetup = false;
-                mActivity.runOnUiThread(() -> setupPlot());
-            }
-        }
-    };
 
     /**
      * CTOR that just sets the plot.
@@ -110,68 +81,15 @@ public class QRSPlotter implements IConstants, IQRSConstants {
 
         mFormatter4 = new LineAndPointFormatter(null, Color.RED, null, null);
         mFormatter4.setLegendIconEnabled(false);
-//        ((LineAndPointFormatter)mFormatter4).getVertexPaint().setStrokeWidth(20);
+//        ((LineAndPointFormatter)mFormatter4).getVertexPaint()
+//        .setStrokeWidth(20);
         mSeries4 = new SimpleXYSeries("Peaks");
 
-        mLock.writeLock().lock();
-        try {
-            mPlot.addListener(mPlotListener);
-            mPlot.addSeries(mSeries2, mFormatter2);
-            mPlot.addSeries(mSeries3, mFormatter3);
-            mPlot.addSeries(mSeries4, mFormatter4);
-            mPlot.addSeries(mSeries1, mFormatter1);
-            setupPlot();
-        } finally {
-            mLock.writeLock().unlock();
-        }
-    }
-
-    /**
-     * Get a new QRSPLotter instance, using the given XYPlot but other values
-     * from the current one. Use for replacing the current plotter.
-     *
-     * @param plot The XYPLot.
-     * @return The new instance.
-     */
-    public QRSPlotter getNewInstance(XYPlot plot) {
-        QRSPlotter newPlotter = new QRSPlotter(plot);
-        newPlotter.mPlot = plot;
-        newPlotter.mActivity = this.mActivity;
-        newPlotter.mDataIndex = this.mDataIndex;
-
-        newPlotter.mFormatter1 = this.mFormatter1;
-        newPlotter.mSeries1 = this.mSeries1;
-
-        newPlotter.mFormatter2 = this.mFormatter2;
-        newPlotter.mSeries2 = this.mSeries2;
-
-        newPlotter.mFormatter3 = this.mFormatter3;
-        newPlotter.mSeries3 = this.mSeries3;
-
-        newPlotter.mFormatter4 = this.mFormatter4;
-        newPlotter.mSeries4 = this.mSeries4;
-
-        newPlotter.mLock.writeLock().lock();
-        try {
-            mPlot.removeListener(mPlotListener);
-            newPlotter.mPlot.addListener(newPlotter.mPlotListener);
-            newPlotter.mPlot.addSeries(mSeries1, mFormatter1);
-            newPlotter.mPlot.addSeries(mSeries2, mFormatter2);
-            newPlotter.mPlot.addSeries(mSeries3, mFormatter3);
-            newPlotter.mPlot.addSeries(mSeries4, mFormatter4);
-            newPlotter.setupPlot();
-        } catch (Exception ex) {
-            String msg = "QRSPLotter.setupPLot: getGraph() is null\n"
-                    + "isLaidout=" + mPlot.isLaidOut()
-                    + "width=" + mPlot.getWidth()
-                    + "height=" + mPlot.getHeight();
-            Utils.excMsg(mActivity, msg, ex);
-            Log.e(TAG, msg, ex);
-        } finally {
-            newPlotter.mLock.writeLock().unlock();
-        }
-
-        return newPlotter;
+        mPlot.addSeries(mSeries2, mFormatter2);
+        mPlot.addSeries(mSeries3, mFormatter3);
+        mPlot.addSeries(mSeries4, mFormatter4);
+        mPlot.addSeries(mSeries1, mFormatter1);
+        setupPlot();
     }
 
     /**
@@ -182,7 +100,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
         Log.d(TAG, this.getClass().getSimpleName() + " setupPlot");
         if (mPlot.getVisibility() == View.GONE) return;
 
-        mLock.writeLock().lock();
         try {
             // Calculate the range limits to make the blocks be square
             // Using .5 mV and nLarge / samplingRate for total grid size
@@ -192,12 +109,7 @@ public class QRSPlotter implements IConstants, IQRSConstants {
             if (gridRect == null) {
                 Log.d(TAG, "QRSPLotter.setupPlot: gridRect is null\n"
                         + "    thread: " + Thread.currentThread().getName()
-                        + " writeHoldCount=" + mLock.getWriteHoldCount()
-                        + " readHoldCount=" + mLock.getReadHoldCount()
-                        + " isWriteLockedByCurrentThread="
-                        + mLock.isWriteLockedByCurrentThread()
                 );
-                mRequestSetup = true;
                 return;
             } else {
                 rMax = .25 * N_DOMAIN_LARGE_BOXES * gridRect.height()
@@ -239,8 +151,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
                     + " height=" + mPlot.getHeight();
             Utils.excMsg(mActivity, msg, ex);
             Log.e(TAG, msg, ex);
-        } finally {
-            mLock.writeLock().unlock();
         }
     }
 
@@ -248,7 +158,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
     public String getLogInfo(double rMax) {
         RectF gridRect = mPlot.getGraph().getGridRect();
         StringBuilder sb = new StringBuilder();
-        mLock.readLock().lock();
         try {
             sb.append("    orientation=")
                     .append(Utils.getOrientation(mActivity)).append("\n");
@@ -412,8 +321,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
                     .append("\n        ").append(ex).append("\n        ")
                     .append(ex.getMessage());
             return sb.toString();
-        } finally {
-            mLock.readLock().unlock();
         }
         return sb.toString();
     }
@@ -430,38 +337,33 @@ public class QRSPlotter implements IConstants, IQRSConstants {
 //                + "addValues: dataIndex=" + mDataIndex + " mSeriesSize="
 //                + mSeries1.size() + " mSeries2Size=" + mSeries2.size()
 //                + " val1=" + val1 + " val2=" + val2);
-        mLock.writeLock().lock();
-        try {
-            // Add the new values, removing old values if needed
-            // Convert from  μV to mV
-            if (val1 != null) {
-                if (mSeries1.size() >= N_TOTAL_POINTS) {
-                    mSeries1.removeFirst();
-                }
-                mSeries1.addLast(mDataIndex, val1);
+        // Add the new values, removing old values if needed
+        // Convert from  μV to mV
+        if (val1 != null) {
+            if (mSeries1.size() >= N_TOTAL_POINTS) {
+                mSeries1.removeFirst();
             }
-
-            if (val2 != null) {
-                if (mSeries2.size() >= N_TOTAL_POINTS) {
-                    mSeries2.removeFirst();
-                }
-                mSeries2.addLast(mDataIndex, val2);
-            }
-
-            if (val3 != null) {
-                if (mSeries3.size() >= N_TOTAL_POINTS) {
-                    mSeries3.removeFirst();
-                }
-                mSeries3.addLast(mDataIndex, val3);
-            }
-
-            mDataIndex++;
-            // Reset the domain boundaries
-            updateDomainBoundaries();
-            update();
-        } finally {
-            mLock.writeLock().unlock();
+            mSeries1.addLast(mDataIndex, val1);
         }
+
+        if (val2 != null) {
+            if (mSeries2.size() >= N_TOTAL_POINTS) {
+                mSeries2.removeFirst();
+            }
+            mSeries2.addLast(mDataIndex, val2);
+        }
+
+        if (val3 != null) {
+            if (mSeries3.size() >= N_TOTAL_POINTS) {
+                mSeries3.removeFirst();
+            }
+            mSeries3.addLast(mDataIndex, val3);
+        }
+
+        mDataIndex++;
+        // Reset the domain boundaries
+        updateDomainBoundaries();
+        update();
     }
 
     public void addPeakValue(int sample, double ecg) {
@@ -470,16 +372,12 @@ public class QRSPlotter implements IConstants, IQRSConstants {
 //                + mSeries4.size()
 //                + " sample=" + sample + " ecg=" + ecg);
 //
-        mLock.writeLock().lock();
-        try {
-            // Remove old values if needed
-            removeOutOfRangeValues();
-            mSeries4.addLast(sample, ecg);
-//        Log.d(TAG, "Added peak value: sample=" + sample + " size=" + mSeries4.size()
+        // Remove old values if needed
+        removeOutOfRangeValues();
+        mSeries4.addLast(sample, ecg);
+//        Log.d(TAG, "Added peak value: sample=" + sample + " size=" +
+//        mSeries4.size()
 //                + " ecg=" + ecg + " mDataIndex=" + mDataIndex);
-        } finally {
-            mLock.writeLock().unlock();
-        }
     }
 
     public void replaceLastPeakValue(int sample, double ecg) {
@@ -488,45 +386,33 @@ public class QRSPlotter implements IConstants, IQRSConstants {
 //                + mSeries4.size()
 //                + " sample=" + sample + " ecg=" + ecg);
 //
-        mLock.writeLock().lock();
-        try {
-            // Remove old values if needed
-            removeOutOfRangeValues();
-            mSeries4.removeLast();
-            mSeries4.addLast(sample, ecg);
+        // Remove old values if needed
+        removeOutOfRangeValues();
+        mSeries4.removeLast();
+        mSeries4.addLast(sample, ecg);
 //            Log.d(TAG, "Replaced peak value: sample=" + sample + " size=" +
 //            mSeries4.size()
 //                    + " ecg=" + ecg + " mDataIndex=" + mDataIndex);
-        } finally {
-            mLock.writeLock().unlock();
-        }
     }
 
     /**
      * Removes peaks with indices that are no longer in range.
      */
     public void removeOutOfRangeValues() {
-        mLock.writeLock().lock();
-        try {
-            // Remove old values if needed
-            long xMin = mDataIndex - N_TOTAL_POINTS;
-            while (mSeries4.size() > 0 && (int) mSeries4.getxVals().getFirst() < xMin) {
-                mSeries4.removeFirst();
-            }
-        } finally {
-            mLock.writeLock().unlock();
+        // Remove old values if needed
+        long xMin = mDataIndex - N_TOTAL_POINTS;
+        while (mSeries4.size() > 0 && (int) mSeries4.getxVals().getFirst() < xMin) {
+            mSeries4.removeFirst();
         }
     }
 
     public void updateDomainBoundaries() {
         if (mPlot.getVisibility() == View.GONE) return;
 
-        mLock.writeLock().lock();
-        try {
-            long plotMin, plotMax;
-            plotMin = mDataIndex - N_ECG_PLOT_POINTS;
-            plotMax = mDataIndex;
-            mPlot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
+        long plotMin, plotMax;
+        plotMin = mDataIndex - N_ECG_PLOT_POINTS;
+        plotMax = mDataIndex;
+        mPlot.setDomainBoundaries(plotMin, plotMax, BoundaryMode.FIXED);
 //        Log.d(TAG, this.getClass().getSimpleName() + "
 //        updateDomainBoundaries: "
 //                + "plotMin=" + plotMin + " plotmax=" + plotMax
@@ -534,9 +420,6 @@ public class QRSPlotter implements IConstants, IQRSConstants {
 //        int colorInt = mPlot.getGraph().getGridBackgroundPaint().getColor();
 //        String hexColor = String.format("#%06X", (0xFFFFFF & colorInt));
 //        Log.d(TAG, "gridBgColor=" + hexColor);
-        } finally {
-            mLock.writeLock().unlock();
-        }
     }
 
     /**
@@ -547,13 +430,8 @@ public class QRSPlotter implements IConstants, IQRSConstants {
 //            Log.d(TAG, this.getClass().getSimpleName()
 //                    + " update: thread: " + Thread.currentThread()
 //                    .getName());
-        mLock.writeLock().lock();
-        try {
-            if (mDataIndex % 73 == 0) {
-                mActivity.runOnUiThread(mPlot::redraw);
-            }
-        } finally {
-            mLock.writeLock().unlock();
+        if (mDataIndex % 73 == 0) {
+            mActivity.runOnUiThread(mPlot::redraw);
         }
     }
 
@@ -563,16 +441,11 @@ public class QRSPlotter implements IConstants, IQRSConstants {
      * @param on Whether to be on or off (true for on).
      */
     public void setPanning(boolean on) {
-        mLock.writeLock().lock();
-        try {
-            if (on) {
-                PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL,
-                        PanZoom.Zoom.NONE);
-            } else {
-                PanZoom.attach(mPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
-            }
-        } finally {
-            mLock.writeLock().unlock();
+        if (on) {
+            PanZoom.attach(mPlot, PanZoom.Pan.HORIZONTAL,
+                    PanZoom.Zoom.NONE);
+        } else {
+            PanZoom.attach(mPlot, PanZoom.Pan.NONE, PanZoom.Zoom.NONE);
         }
     }
 
@@ -580,16 +453,11 @@ public class QRSPlotter implements IConstants, IQRSConstants {
      * Clears the plot and resets dataIndex.
      */
     public void clear() {
-        mLock.writeLock().lock();
-        try {
-            mDataIndex = 0;
-            mSeries1.clear();
-            mSeries2.clear();
-            mSeries3.clear();
-            mSeries4.clear();
-            update();
-        } finally {
-            mLock.writeLock().unlock();
-        }
+        mDataIndex = 0;
+        mSeries1.clear();
+        mSeries2.clear();
+        mSeries3.clear();
+        mSeries4.clear();
+        update();
     }
 }
