@@ -303,7 +303,7 @@ public class ECGActivity extends AppCompatActivity
 
     @Override
     protected void onPause() {
-        Log.v(TAG, this.getClass().getSimpleName() + " onPause");
+        Log.d(TAG, this.getClass().getSimpleName() + " onPause");
         super.onPause();
 
         if (mApi != null) mApi.backgroundEntered();
@@ -1236,7 +1236,7 @@ public class ECGActivity extends AppCompatActivity
             Utils.errMsg(this, "streamECG: Device is not connected yet");
             return;
         }
-        logEpochInfo("UTC");
+//        logEpochInfo("UTC");
         if (mEcgDisposable == null) {
             // Set the local time to get correct timestamps. H10 apparently
             // resets its time to 01:01:2019 00:00:00 when connected to strap
