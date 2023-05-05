@@ -219,10 +219,13 @@ public class ECGActivity extends AppCompatActivity
                             resetDeviceId(oldDeviceId);
                         }
                         // PREF_QRS_VISIBILITY
+                        boolean oldUseQRSPlot = mUseQRSPlot;
                         mUseQRSPlot = mSharedPreferences.getBoolean(
                                 PREF_QRS_VISIBILITY, true);
-                        setQRSVisibility();
-                        mResetECGPlot = true;
+                        if(oldUseQRSPlot != mUseQRSPlot) {
+                            setQRSVisibility();
+                            mResetECGPlot = true;
+                        }
                     });
 
     @Override
