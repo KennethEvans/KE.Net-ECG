@@ -154,8 +154,57 @@ public class QRSPlotter implements IConstants, IQRSConstants {
         }
     }
 
+    /**
+     * Get a new QRSPLotter instance, using the given XYPlot but other values
+     * from the current one. Use for replacing the current plotter.
+     *
+     * @param plot The XYPLot.
+     * @return The new instance.
+     */
+    public QRSPlotter getNewInstance(XYPlot plot) {
+        QRSPlotter newPlotter = new QRSPlotter(plot);
+        newPlotter.mPlot = plot;
+        newPlotter.mActivity = this.mActivity;
+        newPlotter.mDataIndex = this.mDataIndex;
+
+        newPlotter.mFormatter1 = this.mFormatter1;
+        newPlotter.mSeries1 = this.mSeries1;
+
+        newPlotter.mFormatter2 = this.mFormatter2;
+        newPlotter.mSeries2 = this.mSeries2;
+
+        newPlotter.mFormatter3 = this.mFormatter3;
+        newPlotter.mSeries3 = this.mSeries3;
+
+        newPlotter.mFormatter4 = this.mFormatter4;
+        newPlotter.mSeries4 = this.mSeries4;
+
+        try {
+            newPlotter.mPlot.addSeries(mSeries1, mFormatter1);
+            newPlotter.mPlot.addSeries(mSeries2, mFormatter2);
+            newPlotter.mPlot.addSeries(mSeries3, mFormatter3);
+            newPlotter.mPlot.addSeries(mSeries4, mFormatter4);
+            newPlotter.setupPlot();
+        } catch (Exception ex) {
+            String msg = "QRSPLotter.setupPLot: getGraph() is null\n"
+                    + "isLaidout=" + mPlot.isLaidOut()
+                    + "width=" + mPlot.getWidth()
+                    + "height=" + mPlot.getHeight();
+            Utils.excMsg(mActivity, msg, ex);
+            Log.e(TAG, msg, ex);
+        }
+
+        return newPlotter;
+    }
+
+    /**
+     * Gets information about the plot.
+     *
+     * @param rMax Value to use for seriesToScreenY(rMax);
+     * @return The information.
+     */
     @SuppressWarnings("unused")
-    public String getLogInfo(double rMax) {
+    public String getPlotInfo(double rMax) {
         RectF gridRect = mPlot.getGraph().getGridRect();
         StringBuilder sb = new StringBuilder();
         try {

@@ -93,8 +93,7 @@ public class ECGActivity extends AppCompatActivity
 
     public boolean mOrientationChangedECG = false;
     public boolean mOrientationChangedQRS = false;
-    // Not used when androidScreenOrientation="portrait"
-//    public boolean mOrientationChangedHR = false;
+    public boolean mOrientationChangedHR = false;
 
     private boolean mBleSupported;
     private boolean mAllPermissionsAsked;
@@ -103,6 +102,7 @@ public class ECGActivity extends AppCompatActivity
 
     //    public boolean useQRSPlotter = true;
     public boolean mUseQRSPlot = false;
+    public boolean mResetECGPlot = false;
 
     /***
      * Whether to save as CSV, Plot, or both.
@@ -222,6 +222,7 @@ public class ECGActivity extends AppCompatActivity
                         mUseQRSPlot = mSharedPreferences.getBoolean(
                                 PREF_QRS_VISIBILITY, true);
                         setQRSVisibility();
+                        mResetECGPlot = true;
                     });
 
     @Override
@@ -346,6 +347,12 @@ public class ECGActivity extends AppCompatActivity
         // Set the visibility of the QRS plot
         mUseQRSPlot = mSharedPreferences.getBoolean(PREF_QRS_VISIBILITY, true);
         setQRSVisibility();
+        Log.d(TAG, "  mResetECGPlot=" + mResetECGPlot
+                + " mECGPlotter=" + mECGPlotter);
+        if (mResetECGPlot) {
+            mResetECGPlot = false;
+            resetConfiguration();
+        }
 
         // Start the connection to the device
         Log.d(TAG, "    mDeviceId=" + mDeviceId);
@@ -1288,6 +1295,12 @@ public class ECGActivity extends AppCompatActivity
         }
     }
 
+    /**
+     * Logs information about the epoch.
+     *
+     * @param tzString The time zone string to use.
+     */
+    @SuppressWarnings("unused")
     public void logEpochInfo(String tzString) {
         SimpleDateFormat sdf =
                 new SimpleDateFormat("dd:MM:yyyy HH:mm:ss", Locale.US);
@@ -1329,6 +1342,14 @@ public class ECGActivity extends AppCompatActivity
         return String.format(Locale.US, "%15d %-8s %.2f years  %s %s",
                 ts, name, msToYears(ts),
                 sdf.format(date), sdf1.format(date));
+    }
+
+    public void setInfoText() {
+        String format = "MMMM dd, yyyy";
+        SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
+        mTextViewInfo.setText(getString(R.string.info_string,
+                mName, mBatteryLevel, mFirmware, mDeviceId,
+                df.format(new Date())));
     }
 
     @SuppressWarnings("unused")
@@ -1476,6 +1497,95 @@ public class ECGActivity extends AppCompatActivity
     }
 
     /**
+     * Resets the configuration after a layout change.
+     */
+    public void resetConfiguration() {
+        Log.d(TAG, this.getClass().getSimpleName() +
+                " onConfigurationChanged: "
+                + " time=" + sdfShort.format(new Date())
+        );
+
+//        The following is when handling orientation change
+//        Not used for anddoidScreenOrientation="portrait"
+        mOrientationChangedECG = mOrientationChangedQRS =
+                mOrientationChangedHR = true;
+
+        TextView hrOld = mTextViewHR;
+        TextView timeOld = mTextViewTime;
+        TextView infoOld = mTextViewInfo;
+
+        // At this point the content view has not been changed. Change it.
+        // It will use the one appropriate to the new orientation.
+        setContentView(R.layout.activity_ecg);
+
+        // At this point the new layouts should be correct but they have
+        // undefined Views.
+        mECGPlot = findViewById(R.id.ecgplot);
+        mQRSPlot = findViewById(R.id.qrsplot);
+        if (!mUseQRSPlot) {
+            mQRSPlot.setVisibility(View.GONE);
+        }
+        mHRPlot = findViewById(R.id.hrplot);
+        mTextViewHR = findViewById(R.id.hr);
+        mTextViewTime = findViewById(R.id.time);
+        mTextViewInfo = findViewById(R.id.info);
+
+        // Put the old information into the new views
+        // Layout ecg
+        mECGPlot.post(() -> {
+            mTextViewHR.setText(hrOld.getText());
+            mTextViewTime.setText(timeOld.getText());
+            mTextViewInfo.setText(infoOld.getText());
+//            Log.d(TAG, "mECGPlot.post (before): time="
+//                    + sdfShort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mECGPlotter)
+//                    + " plot=" + Utils.getHashCode(mECGPlot)
+//                    + " isLaidOut=" + mECGPlot.isLaidOut()
+//            );
+            mECGPlotter = mECGPlotter.getNewInstance(mECGPlot);
+            mECGPlotter.setPanning(!mPlaying);
+            mOrientationChangedECG = false;
+//            Log.d(TAG, "mECGPlot.post (after): time="
+//                    + sdfShort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mECGPlotter)
+//                    + " plot=" + Utils.getHashCode(mECGPlot)
+        });
+
+        // Layout analysis
+        mQRSPlot.post(() -> {
+//            Log.d(TAG, "mQRSPlot.post (before): time="
+//                    + sdfShort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mQRSPlotter)
+//                    + " plot=" + Utils.getHashCode(mQRSPlot)
+//                    + " isLaidOut=" + mQRSPlot.isLaidOut()
+//            );
+            mQRSPlotter = mQRSPlotter.getNewInstance(mQRSPlot);
+            mQRSPlotter.setPanning(!mPlaying);
+            mOrientationChangedQRS = false;
+//            Log.d(TAG, "mQRSPlot.post (after): time="
+//                    + sdfShort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mQRSPlotter)
+//                    + " plot=" + Utils.getHashCode(mQRSPlot)
+//            );
+        });
+        mHRPlot.post(() -> {
+//            Log.d(TAG, "mHRPlot.post (before): time="
+//                    + sdfShort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mHRPlotter)
+//                    + " plot=" + Utils.getHashCode(mHRPlot)
+//                    + " isLaidOut=" + mHRPlot.isLaidOut()
+//            );
+            mHRPlotter = mHRPlotter.getNewInstance(mHRPlot);
+            mOrientationChangedHR = false;
+//            Log.d(TAG, "mHRPlot.post (after): time="
+//                    + sdfShort.format(new Date())
+//                    + " plotter=" + Utils.getHashCode(mHRPlotter)
+//                    + " plot=" + Utils.getHashCode(mHRPlot)
+//            );
+        });
+    }
+
+    /**
      * Sets the QRS plot visibility from the current value of mUseQRSPlot.
      */
     private void setQRSVisibility() {
@@ -1600,8 +1710,7 @@ public class ECGActivity extends AppCompatActivity
                         "-00805f9b34fb"))) {
                     mFirmware = s1.trim();
                     Log.d(TAG, "*Firmware: " + s + " " + mFirmware);
-                    mTextViewInfo.setText(getString(R.string.info_string,
-                            mName, mBatteryLevel, mFirmware, mDeviceId));
+                    setInfoText();
                 }
             }
 
@@ -1609,8 +1718,7 @@ public class ECGActivity extends AppCompatActivity
             public void batteryLevelReceived(@NonNull String s, int i) {
                 mBatteryLevel = Integer.toString(i);
                 Log.d(TAG, "*Battery level " + s + " " + i);
-                mTextViewInfo.setText(getString(R.string.info_string,
-                        mName, mBatteryLevel, mFirmware, mDeviceId));
+                setInfoText();
             }
 
             @Override

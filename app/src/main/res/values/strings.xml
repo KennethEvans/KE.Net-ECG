@@ -30,7 +30,7 @@
     <string name="restart_api_item">Restart Polar API</string>
     <string name="device_id_item">Set Device ID</string>
     <string name="settings_item">Settings</string>
-    <string name="info_string">%1$s\nBattery level: %2$s\nFirmware: %3$s\nID: %4$s\n</string>
+    <string name="info_string">%1$s\nBattery level: %2$s\nFirmware: %3$s\nID: %4$s\n%5$s\n</string>
     <string name="connected_string">Connected to %1$s</string>
     <string name="ble_not_supported">Bluetooth LE is not supported.</string>
     <string name="permission_not_granted">All of the necessary permissions for this application to work properly have not been granted. You can change the permissions in Settings | apps.</string>

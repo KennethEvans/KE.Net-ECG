@@ -418,7 +418,7 @@ public class ECGPlotter implements IConstants, IQRSConstants {
      * Gets info about the view.
      */
     @SuppressWarnings("unused")
-    private String getPlotInfo() {
+    public String getPlotInfo() {
         final String LF = "\n";
         StringBuilder sb = new StringBuilder();
 
