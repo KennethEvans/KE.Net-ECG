@@ -898,12 +898,16 @@ public class ECGActivity extends AppCompatActivity
                         String.format(Locale.US, "%.1f sec", nSamples / FS),
                         ecgvals,
                         peakvals);
-                bm.compress(Bitmap.CompressFormat.PNG, 80, strm);
+                Log.d(TAG, "Bitmap Byte count=" + bm.getByteCount());
+                boolean res = bm.compress(Bitmap.CompressFormat.PNG, 80, strm);
+                if (!res) {
+                    Utils.errMsg(this, "failed to get bitmap");
+                }
                 strm.close();
                 msg = "Wrote " + docUri.getLastPathSegment();
-                Log.d(TAG, msg);
                 Utils.infoMsg(this, msg);
             }
+            pfd.close();
         } catch (Exception ex) {
             msg = "Error saving plot";
             Log.e(TAG, msg);
@@ -973,8 +977,8 @@ public class ECGActivity extends AppCompatActivity
                 }
                 out.flush();
                 msg = "Wrote " + docUri.getLastPathSegment();
-                Log.d(TAG, msg);
                 Utils.infoMsg(this, msg);
+                pfd.close();
             }
         } catch (Exception ex) {
             msg = "Error writing CSV file";
@@ -1039,6 +1043,7 @@ public class ECGActivity extends AppCompatActivity
                 Utils.infoMsg(this, msg);
                 Log.d(TAG, "    Wrote " + dataList.size() + " items");
             }
+            pfd.close();
         } catch (Exception ex) {
             msg = "Error writing " + saveType + " CSV file";
             Log.e(TAG, msg);
